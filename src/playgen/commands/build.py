@@ -5,6 +5,15 @@ Instead of 20+ sequential CLI calls, an Agent can output one JSON
 description and get a complete, runnable scene with all resources,
 scripts, nodes, and signal connections.
 
+v0.7.0 enhancements:
+- Auto-visual placeholders for body types (fixes #1 Agent failure mode at build time)
+- Type inference from shorthands (texture → Sprite2D, text → Label, audio → AudioStreamPlayer)
+- "text" shorthand for Label/Button nodes
+- "color" shorthand for visual nodes
+- "size" shorthand for Control nodes (custom_minimum_size)
+- collision_layer / collision_mask shorthand (integer or list of layer numbers)
+- Script template variables ({{SPEED}}, {{JUMP_VELOCITY}}, etc.)
+
 v0.5.0 enhancements:
 - Auto-snapshot before build (--snapshot)
 - Asset references in node definitions (auto ext_resource)
@@ -14,6 +23,7 @@ v0.5.0 enhancements:
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -22,6 +32,97 @@ import click
 from playgen.godot.tscn import Scene, Connection, write_tscn, auto_quote_value, BODY_TYPES, BODY_TYPES_3D
 from playgen.godot.project_file import load_project, save_project
 from playgen.templates import SCRIPT_TEMPLATES, EXTENDS_DEFAULTS
+
+
+# ─── Type inference rules ────────────────────────────────────────────
+# If "type" is omitted in a node definition, infer from context.
+
+def _infer_type(node_def: dict) -> str:
+    """Infer node type from shorthands present in the definition."""
+    if node_def.get("type"):
+        return node_def["type"]
+    if node_def.get("texture"):
+        return "Sprite2D"
+    if node_def.get("audio"):
+        return "AudioStreamPlayer"
+    if node_def.get("text") is not None:
+        # Has text → Label (unless it has a "pressed" signal → Button)
+        return "Label"
+    if node_def.get("font"):
+        return "Label"
+    if node_def.get("instance"):
+        return ""  # Instance nodes have empty type
+    return ""
+
+
+# ─── Auto-visual placeholder colors ──────────────────────────────────
+# Rotating palette so each body gets a different color.
+
+_PLACEHOLDER_COLORS = [
+    "Color(0.25, 0.6, 1.0, 1)",     # Blue
+    "Color(1.0, 0.4, 0.4, 1)",      # Red
+    "Color(0.4, 0.9, 0.4, 1)",      # Green
+    "Color(1.0, 0.8, 0.2, 1)",      # Yellow
+    "Color(0.8, 0.4, 1.0, 1)",      # Purple
+    "Color(1.0, 0.6, 0.2, 1)",      # Orange
+    "Color(0.3, 0.9, 0.9, 1)",      # Cyan
+    "Color(1.0, 0.5, 0.7, 1)",      # Pink
+]
+
+_DEFAULT_PLACEHOLDER_SIZE = (32, 32)  # Default polygon half-size
+
+
+def _collision_layers_to_int(layers) -> int:
+    """Convert collision layer spec to integer bitmask.
+
+    Accepts:
+    - int: used directly
+    - list of ints: each is a layer number (1-based), OR'd together
+    - str: parsed as int
+    """
+    if isinstance(layers, int):
+        return layers
+    if isinstance(layers, str):
+        return int(layers)
+    if isinstance(layers, list):
+        mask = 0
+        for layer in layers:
+            n = int(layer)
+            if 1 <= n <= 32:
+                mask |= (1 << (n - 1))
+        return mask
+    return 1
+
+
+_TEMPLATE_DEFAULTS: dict[str, dict[str, str]] = {
+    "platformer-player": {"SPEED": "300.0", "JUMP_VELOCITY": "-450.0"},
+    "topdown-player": {"SPEED": "200.0"},
+}
+
+# Defaults also apply to EXTENDS_DEFAULTS templates
+_EXTENDS_TEMPLATE_DEFAULTS: dict[str, dict[str, str]] = {
+    "CharacterBody2D": {"SPEED": "200.0"},
+}
+
+
+def _apply_template_vars(content: str, variables: dict[str, str]) -> str:
+    """Replace {{VAR}} placeholders in script content with values."""
+    for key, val in variables.items():
+        content = content.replace("{{" + key + "}}", str(val))
+    return content
+
+
+def _fill_template_defaults(content: str, template_name: str | None,
+                            extends_type: str | None) -> str:
+    """Fill any remaining {{VAR}} placeholders with default values."""
+    defaults = {}
+    if template_name and template_name in _TEMPLATE_DEFAULTS:
+        defaults.update(_TEMPLATE_DEFAULTS[template_name])
+    if extends_type and extends_type in _EXTENDS_TEMPLATE_DEFAULTS:
+        defaults.update(_EXTENDS_TEMPLATE_DEFAULTS[extends_type])
+    for key, val in defaults.items():
+        content = content.replace("{{" + key + "}}", val)
+    return content
 
 
 @click.command("build")
@@ -118,6 +219,7 @@ def build_cmd(ctx: click.Context, source: str, as_json: bool, dry_run: bool, sna
             extends_type = script_spec.get("extends", "Node")
             # Support both "body" and "content" keys for inline script content
             content_raw = script_spec.get("body") or script_spec.get("content")
+            template_vars = script_spec.get("vars", {})
 
             if content_raw:
                 content = content_raw
@@ -127,6 +229,11 @@ def build_cmd(ctx: click.Context, source: str, as_json: bool, dry_run: bool, sna
                 content = EXTENDS_DEFAULTS[extends_type]
             else:
                 content = f"extends {extends_type}\n\n\nfunc _ready() -> void:\n\tpass\n\n\nfunc _process(delta: float) -> void:\n\tpass\n"
+
+            # Apply template variable substitutions (user vars first, then defaults)
+            if template_vars:
+                content = _apply_template_vars(content, template_vars)
+            content = _fill_template_defaults(content, template_name, extends_type)
         else:
             content = "extends Node\n\n\nfunc _ready() -> void:\n\tpass\n"
 
@@ -154,9 +261,11 @@ def build_cmd(ctx: click.Context, source: str, as_json: bool, dry_run: bool, sna
         _error("Missing 'root' in build description", as_json, ctx)
         return
 
+    color_index = [0]  # mutable counter for auto-visual colors
+
     def _add_node(node_def: dict, parent: str | None) -> None:
         name = node_def.get("name", "Node")
-        node_type = node_def.get("type", "")
+        node_type = node_def.get("type", "") or _infer_type(node_def)
         # Convert all property values to strings first (JSON may have int/float/bool)
         raw_props = node_def.get("properties", {})
         props = {}
@@ -169,6 +278,39 @@ def build_cmd(ctx: click.Context, source: str, as_json: bool, dry_run: bool, sna
                 props[k] = auto_quote_value(str(v))
         instance_scene = node_def.get("instance")
         node_groups = list(node_def.get("groups", []))
+
+        # Handle "text" shorthand for Label/Button/RichTextLabel
+        text_val = node_def.get("text")
+        if text_val is not None:
+            props["text"] = auto_quote_value(str(text_val))
+
+        # Handle "color" shorthand
+        color_val = node_def.get("color")
+        if color_val is not None:
+            color_str = str(color_val)
+            # If it's already a Godot Color(), use as-is; otherwise wrap it
+            if not color_str.startswith("Color"):
+                color_str = auto_quote_value(color_str)
+            if node_type in ("Polygon2D", "ColorRect"):
+                props["color"] = color_str
+            else:
+                props["modulate"] = color_str
+
+        # Handle "size" shorthand for Control-derived nodes
+        size_val = node_def.get("size")
+        if size_val is not None:
+            if isinstance(size_val, list) and len(size_val) == 2:
+                props["custom_minimum_size"] = f"Vector2({size_val[0]}, {size_val[1]})"
+            elif isinstance(size_val, str):
+                props["custom_minimum_size"] = size_val
+
+        # Handle collision_layer / collision_mask shorthands
+        col_layer = node_def.get("collision_layer")
+        if col_layer is not None:
+            props["collision_layer"] = str(_collision_layers_to_int(col_layer))
+        col_mask = node_def.get("collision_mask")
+        if col_mask is not None:
+            props["collision_mask"] = str(_collision_layers_to_int(col_mask))
 
         # Handle script shorthand
         script = node_def.get("script")
@@ -248,18 +390,44 @@ def build_cmd(ctx: click.Context, source: str, as_json: bool, dry_run: bool, sna
                 properties={"shape": f'SubResource("{shape_sub_id}")'},
             )
 
+        # Determine child parent path for recursion and auto-visual
+        if parent is None:
+            child_parent = "."
+        elif parent == ".":
+            child_parent = name
+        else:
+            child_parent = f"{parent}/{name}"
+
         # Recurse children
         children = node_def.get("children", [])
         if children:
-            if parent is None:
-                child_parent = "."
-            elif parent == ".":
-                child_parent = name
-            else:
-                child_parent = f"{parent}/{name}"
             for child_def in children:
                 _add_node(child_def, child_parent)
 
+        # Auto-visual: if body type has no visual children, auto-create placeholder
+        if node_type in BODY_TYPES and not instance_scene:
+            _has_visual = _def_has_visual_child(node_def)
+            if not _has_visual:
+                c = _PLACEHOLDER_COLORS[color_index[0] % len(_PLACEHOLDER_COLORS)]
+                color_index[0] += 1
+                # Determine placeholder size from shape if available
+                w, h = _DEFAULT_PLACEHOLDER_SIZE
+                if shape_ref and ":" in str(shape_ref):
+                    w, h = _extract_shape_size(str(shape_ref))
+                is_3d = node_type in BODY_TYPES_3D
+                if is_3d:
+                    scene.add_node(
+                        f"{name}Visual", "MeshInstance3D", parent=child_parent,
+                    )
+                else:
+                    poly = f"PackedVector2Array(-{w}, -{h}, {w}, -{h}, {w}, {h}, -{w}, {h})"
+                    scene.add_node(
+                        f"{name}Visual", "Polygon2D", parent=child_parent,
+                        properties={"color": c, "polygon": poly},
+                    )
+                auto_visuals.append(name)
+
+    auto_visuals: list[str] = []  # track which nodes got auto-visual placeholders
     _add_node(root_def, None)
 
     # Process connections
@@ -301,6 +469,8 @@ def build_cmd(ctx: click.Context, source: str, as_json: bool, dry_run: bool, sna
         "connections": len(scene.connections),
         "dry_run": dry_run,
     }
+    if auto_visuals:
+        result["auto_visuals"] = auto_visuals
     if vis_report.has_issues:
         result["visibility_warnings"] = [w.to_dict() for w in vis_report.warnings]
     if snap_name:
@@ -326,6 +496,10 @@ def build_cmd(ctx: click.Context, source: str, as_json: bool, dry_run: bool, sna
             click.echo(f"  Files ({len(created_files)}):")
             for f in created_files:
                 click.echo(f"    {project_path / f}")
+        if auto_visuals:
+            click.echo(f"  Auto-visual placeholders ({len(auto_visuals)}):")
+            for av in auto_visuals:
+                click.echo(f"    {av} — Polygon2D placeholder added (replace with Sprite2D + texture)")
         if vis_report.has_issues:
             click.echo(f"  Visibility warnings:")
             for w in vis_report.warnings:
@@ -372,6 +546,39 @@ def _configure_project(data: dict, project_path: Path, errors: list[str], dry_ru
 
     if not dry_run:
         save_project(proj, project_path)
+
+
+def _def_has_visual_child(node_def: dict) -> bool:
+    """Check if a node definition has any visual child in its JSON tree."""
+    from playgen.godot.visibility import VISUAL_TYPES
+    for child in node_def.get("children", []):
+        child_type = child.get("type", "")
+        if child_type in VISUAL_TYPES:
+            return True
+        if child.get("instance"):
+            return True  # Instances may contain visuals
+        if _def_has_visual_child(child):
+            return True
+    return False
+
+
+def _extract_shape_size(shape_ref: str) -> tuple[int, int]:
+    """Extract half-size from inline shape for auto-visual polygon sizing."""
+    if ":" not in shape_ref:
+        return _DEFAULT_PLACEHOLDER_SIZE
+    shape_type, params = shape_ref.split(":", 1)
+    parts = [p.strip() for p in params.split(",")]
+    try:
+        if shape_type == "RectangleShape2D" and len(parts) == 2:
+            return int(float(parts[0]) / 2), int(float(parts[1]) / 2)
+        elif shape_type == "CircleShape2D" and len(parts) == 1:
+            r = int(float(parts[0]))
+            return r, r
+        elif shape_type == "CapsuleShape2D" and len(parts) == 2:
+            return int(float(parts[0])), int(float(parts[1]) / 2)
+    except (ValueError, IndexError):
+        pass
+    return _DEFAULT_PLACEHOLDER_SIZE
 
 
 def _parse_inline_shape(shape_type: str, params: str) -> dict[str, str]:

@@ -19,8 +19,8 @@ from playgen.godot.project_file import GodotProject, write_project_file
 PLAYER_PLATFORMER_2D = '''\
 extends CharacterBody2D
 
-const SPEED = 300.0
-const JUMP_VELOCITY = -450.0
+const SPEED = {{SPEED}}
+const JUMP_VELOCITY = {{JUMP_VELOCITY}}
 
 var gravity: float = ProjectSettings.get_setting("physics/2d/default_gravity")
 
@@ -43,7 +43,7 @@ func _physics_process(delta: float) -> void:
 PLAYER_TOPDOWN_2D = '''\
 extends CharacterBody2D
 
-const SPEED = 200.0
+const SPEED = {{SPEED}}
 
 func _physics_process(_delta: float) -> void:
 \tvar input_dir := Vector2(
@@ -485,7 +485,7 @@ EXTENDS_DEFAULTS: dict[str, str] = {
     "CharacterBody2D": '''\
 extends CharacterBody2D
 
-const SPEED = 200.0
+const SPEED = {{SPEED}}
 
 func _physics_process(_delta: float) -> void:
 \tvar input_dir := Vector2(

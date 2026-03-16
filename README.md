@@ -91,7 +91,42 @@ PlayGenCLI uses a **hybrid execution model**:
 
 ---
 
+## Agent Prompt Guide
+
+See [AGENT_GUIDE.md](AGENT_GUIDE.md) for a comprehensive guide on how to use PlayGenCLI effectively as an AI Agent. Covers: build JSON schema, all shorthands, script templates, recommended workflow, common patterns, and debugging checklist.
+
 ## Changelog
+
+### v0.7.0 — 2026-03-16
+
+**Build intelligence** — the build command now actively prevents the #1 Agent failure mode instead of just warning about it.
+
+**Auto-visual placeholders:**
+- Body types (`CharacterBody2D`, `Area2D`, `StaticBody2D`, `RigidBody2D`, + 3D) without visual children now automatically get a colored `Polygon2D` placeholder
+- Each body node gets a different color from an 8-color palette for easy identification
+- Placeholder size matches the collision shape if one is provided
+- Build output includes `auto_visuals` array listing which nodes got placeholders
+- Agent should replace placeholders with real `Sprite2D` + texture when assets are available
+
+**Type inference:**
+- Omitting `"type"` in build JSON now infers from context: `"texture"` → `Sprite2D`, `"audio"` → `AudioStreamPlayer`, `"text"` → `Label`
+- Explicit `"type"` always takes precedence
+
+**New shorthands:**
+- `"text"` — Sets text property on Label/Button nodes: `{"name": "Title", "text": "Game Over"}`
+- `"color"` — Sets color (Polygon2D, ColorRect) or modulate (other nodes): `"color": "Color(1, 0, 0, 1)"`
+- `"size"` — Sets custom_minimum_size on Control nodes: `"size": [200, 100]`
+- `"collision_layer"` / `"collision_mask"` — Accept integer bitmask or list of layer numbers: `"collision_layer": [1, 3]`
+
+**Template variables:**
+- Script templates now support `"vars"` for customizing constants: `{"template": "platformer-player", "vars": {"SPEED": "500.0"}}`
+- `platformer-player`: SPEED, JUMP_VELOCITY
+- `topdown-player`: SPEED
+- Unset vars use sensible defaults
+
+**Agent Prompt Guide:**
+- New `AGENT_GUIDE.md` with complete reference for Agent integration
+- Covers: build JSON schema, all shorthands, script templates, recommended workflow, common patterns, debugging checklist
 
 ### v0.6.0 — 2026-03-16
 

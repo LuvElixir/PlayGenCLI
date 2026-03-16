@@ -309,8 +309,8 @@ class TestAnalyzeVisibility:
 # ─── Integration with build ─────────────────────────────────────────────
 
 class TestBuildVisibility:
-    def test_build_warns_invisible(self, project, runner):
-        """build should auto-warn about invisible nodes."""
+    def test_build_auto_visual_placeholder(self, project, runner):
+        """build should auto-create visual placeholder for body nodes."""
         desc = json.dumps({
             "scene": "test.tscn",
             "root": {
@@ -323,10 +323,10 @@ class TestBuildVisibility:
         result = runner.invoke(main, ["--project", str(project), "build", "-"], input=desc)
         assert result.exit_code == 0
         assert "Enemy" in result.output
-        assert "visual" in result.output.lower()
+        assert "placeholder" in result.output.lower()
 
-    def test_build_warns_invisible_json(self, project, runner):
-        """build --json-output includes visibility_warnings."""
+    def test_build_auto_visual_json(self, project, runner):
+        """build --json-output includes auto_visuals for body nodes."""
         desc = json.dumps({
             "scene": "test.tscn",
             "root": {
@@ -341,8 +341,10 @@ class TestBuildVisibility:
         ], input=desc)
         assert result.exit_code == 0
         data = json.loads(result.output)
-        assert "visibility_warnings" in data
-        assert any(w["node"] == "Ghost" for w in data["visibility_warnings"])
+        assert "auto_visuals" in data
+        assert "Ghost" in data["auto_visuals"]
+        # No visibility_warnings because auto-visual fixed it
+        assert "visibility_warnings" not in data
 
     def test_build_no_warn_with_visual(self, project, runner):
         """build with visual children → no visibility warnings."""
