@@ -141,7 +141,7 @@ def script_list(ctx: click.Context, as_json: bool) -> None:
     project_path: Path = ctx.obj["project_path"]
 
     scripts = sorted(project_path.rglob("*.gd"))
-    scripts = [s for s in scripts if ".godot" not in s.parts]
+    scripts = [s for s in scripts if ".godot" not in s.parts and ".playgen" not in s.parts]
 
     if as_json:
         result = []

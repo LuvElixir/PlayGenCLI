@@ -116,7 +116,8 @@ def build_cmd(ctx: click.Context, source: str, as_json: bool, dry_run: bool, sna
         elif isinstance(script_spec, dict):
             template_name = script_spec.get("template")
             extends_type = script_spec.get("extends", "Node")
-            content_raw = script_spec.get("content")
+            # Support both "body" and "content" keys for inline script content
+            content_raw = script_spec.get("body") or script_spec.get("content")
 
             if content_raw:
                 content = content_raw
@@ -156,7 +157,16 @@ def build_cmd(ctx: click.Context, source: str, as_json: bool, dry_run: bool, sna
     def _add_node(node_def: dict, parent: str | None) -> None:
         name = node_def.get("name", "Node")
         node_type = node_def.get("type", "")
-        props = {k: auto_quote_value(v) for k, v in node_def.get("properties", {}).items()}
+        # Convert all property values to strings first (JSON may have int/float/bool)
+        raw_props = node_def.get("properties", {})
+        props = {}
+        for k, v in raw_props.items():
+            if isinstance(v, bool):
+                props[k] = "true" if v else "false"
+            elif isinstance(v, (int, float)):
+                props[k] = str(v)
+            else:
+                props[k] = auto_quote_value(str(v))
         instance_scene = node_def.get("instance")
         node_groups = list(node_def.get("groups", []))
 
@@ -307,7 +317,9 @@ def build_cmd(ctx: click.Context, source: str, as_json: bool, dry_run: bool, sna
         click.echo(f"  ExtResources: {len(scene.ext_resources)}")
         click.echo(f"  Connections: {len(scene.connections)}")
         if created_files:
-            click.echo(f"  Files: {', '.join(created_files)}")
+            click.echo(f"  Files ({len(created_files)}):")
+            for f in created_files:
+                click.echo(f"    {project_path / f}")
 
 
 def _configure_project(data: dict, project_path: Path, errors: list[str], dry_run: bool) -> None:
@@ -333,7 +345,8 @@ def _configure_project(data: dict, project_path: Path, errors: list[str], dry_ru
     for key, value in config.items():
         parts = key.split("/", 1)
         if len(parts) == 2:
-            proj.set(parts[0], parts[1], str(value))
+            from playgen.commands.config_cmd import _auto_quote_config_value
+            proj.set(parts[0], parts[1], _auto_quote_config_value(str(value)))
 
     if input_map:
         from playgen.commands.input_cmd import format_input_value
