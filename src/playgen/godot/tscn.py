@@ -163,6 +163,7 @@ _NO_QUOTE_RES = [
     re.compile(r"^0x[0-9a-fA-F]+$"),                     # Hex
     re.compile(r"^(true|false|null|inf|nan|-inf)$"),      # Keywords
     re.compile(r"^(Vector[234]i?|Color|Rect2i?|Transform[23]D|Basis|Quaternion|Plane|AABB|Projection)\("),
+    re.compile(r"^(Vector[234]i?|Color|Rect2i?|Transform[23]D|Basis|Quaternion|Plane|AABB|Projection)\.[A-Z_]+$"),
     re.compile(r"^Packed(String|Vector[23]|Int[36][24]|Float[36][24]|Byte|Color)Array\("),
     re.compile(r"^(ExtResource|SubResource)\("),
     re.compile(r"^(Array|Dictionary)\("),
