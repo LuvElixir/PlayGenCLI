@@ -4,6 +4,11 @@ This is the highest-leverage command for Agent-driven development.
 Instead of 20+ sequential CLI calls, an Agent can output one JSON
 description and get a complete, runnable scene with all resources,
 scripts, nodes, and signal connections.
+
+v0.5.0 enhancements:
+- Auto-snapshot before build (--snapshot)
+- Asset references in node definitions (auto ext_resource)
+- Optional engine-native validation after build (--validate)
 """
 
 from __future__ import annotations
@@ -23,8 +28,10 @@ from playgen.templates import SCRIPT_TEMPLATES, EXTENDS_DEFAULTS
 @click.argument("source", default="-")
 @click.option("--json-output", "as_json", is_flag=True, help="Output as JSON")
 @click.option("--dry-run", is_flag=True, help="Show what would be created without writing files")
+@click.option("--snapshot", "snap_name", default=None, help="Auto-save snapshot before build (safety net)")
+@click.option("--validate", is_flag=True, help="Validate scene with Godot engine after build (requires Godot)")
 @click.pass_context
-def build_cmd(ctx: click.Context, source: str, as_json: bool, dry_run: bool) -> None:
+def build_cmd(ctx: click.Context, source: str, as_json: bool, dry_run: bool, snap_name: str | None, validate: bool) -> None:
     """Build a scene from a JSON description.
 
     SOURCE is a JSON file path, or '-' to read from stdin.
@@ -80,6 +87,15 @@ def build_cmd(ctx: click.Context, source: str, as_json: bool, dry_run: bool) -> 
 
     created_files: list[str] = []
     errors: list[str] = []
+
+    # Auto-snapshot before build if requested
+    if snap_name and not dry_run:
+        from playgen.commands.snapshot_cmd import save_snapshot
+        snap_result = save_snapshot(project_path, snap_name)
+        if "error" in snap_result:
+            errors.append(f"Snapshot failed: {snap_result['error']}")
+        elif not as_json:
+            click.echo(f"Snapshot saved: {snap_name}")
 
     # --- 0. Configure project (autoloads, config, input_map) ---
     _configure_project(data, project_path, errors, dry_run)
@@ -182,6 +198,22 @@ def build_cmd(ctx: click.Context, source: str, as_json: bool, dry_run: bool) -> 
             ext_res = scene.add_ext_resource("Texture2D", texture)
             props["texture"] = f'ExtResource("{ext_res.id}")'
 
+        # Handle audio shorthand (for AudioStreamPlayer nodes)
+        audio = node_def.get("audio")
+        if audio:
+            if not audio.startswith("res://"):
+                audio = f"res://{audio}"
+            ext_res = scene.add_ext_resource("AudioStream", audio)
+            props["stream"] = f'ExtResource("{ext_res.id}")'
+
+        # Handle font shorthand (for Label/Button nodes)
+        font = node_def.get("font")
+        if font:
+            if not font.startswith("res://"):
+                font = f"res://{font}"
+            ext_res = scene.add_ext_resource("FontFile", font)
+            props["theme_override_fonts/font"] = f'ExtResource("{ext_res.id}")'
+
         # Handle instance
         if instance_scene:
             if not instance_scene.startswith("res://"):
@@ -236,6 +268,15 @@ def build_cmd(ctx: click.Context, source: str, as_json: bool, dry_run: bool) -> 
         scene_path.write_text(write_tscn(scene), encoding="utf-8")
     created_files.append(scene_name)
 
+    # Optional engine-native validation
+    validation = None
+    if validate and not dry_run:
+        from playgen.godot.bridge import validate_scene as _validate_scene
+        val_result = _validate_scene(project_path, scene_name)
+        validation = val_result.to_dict()
+        if not val_result.success:
+            errors.append(f"Engine validation failed: {val_result.error}")
+
     # Output
     result = {
         "scene": scene_name,
@@ -246,6 +287,10 @@ def build_cmd(ctx: click.Context, source: str, as_json: bool, dry_run: bool) -> 
         "connections": len(scene.connections),
         "dry_run": dry_run,
     }
+    if snap_name:
+        result["snapshot"] = snap_name
+    if validation is not None:
+        result["validation"] = validation
     if errors:
         result["errors"] = errors
 
