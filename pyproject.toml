@@ -4,15 +4,21 @@ build-backend = "hatchling.build"
 
 [project]
 name = "playgen"
-version = "0.4.0"
-description = "Vibe game dev CLI - from idea to playable Godot 4.x prototype"
+version = "0.5.1"
+description = "Agent execution layer for Godot 4.x — from idea to playable prototype"
 requires-python = ">=3.10"
 dependencies = [
     "click>=8.0",
 ]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
 
 [project.scripts]
 playgen = "playgen.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/playgen"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
