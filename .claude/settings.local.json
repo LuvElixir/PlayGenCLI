@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(pip install:*)",
+      "Bash(playgen --help 2>&1)",
+      "Bash(playgen init:*)",
+      "Bash(mkdir -p /tmp/test-game && playgen --project /tmp/test-game init --name \"TestPlatformer\" --template 2d-platformer 2>&1)",
+      "Bash(playgen --project /tmp/test-game analyze 2>&1)",
+      "Bash(playgen --project /tmp/test-game scene tree main.tscn 2>&1)",
+      "Bash(playgen --project /tmp/test-game doctor 2>&1)",
+      "Bash(playgen --project /tmp/test-game analyze --json-output 2>&1)",
+      "Bash(playgen --project /tmp/test-game node add main.tscn --name \"Coin\" --type \"Area2D\" --parent \".\" -P \"position=Vector2\\(400, 350\\)\" 2>&1)",
+      "Bash(playgen --project /tmp/test-game script create coin.gd --extends Area2D 2>&1)",
+      "Bash(playgen --project /tmp/test-game script attach main.tscn --node Coin --script coin.gd 2>&1)",
+      "Bash(mkdir -p /tmp/test-topdown && playgen --project /tmp/test-topdown init --name \"TopDownGame\" --template 2d-topdown 2>&1)",
+      "Bash(playgen --project /tmp/test-topdown scene tree main 2>&1)",
+      "Bash(mkdir -p /tmp/test-v2 && playgen --project /tmp/test-v2 init --name TestV2 2>&1)",
+      "Bash(echo '{\"scene\":\"level.tscn\",\"resources\":[{\"id\":\"ps\",\"type\":\"RectangleShape2D\",\"properties\":{\"size\":\"Vector2\\(28, 44\\)\"}},{\"id\":\"floor_s\",\"type\":\"RectangleShape2D\",\"properties\":{\"size\":\"Vector2\\(1200, 40\\)\"}}],\"scripts\":{\"hero.gd\":{\"extends\":\"CharacterBody2D\"},\"coin.gd\":{\"extends\":\"Area2D\"}},\"root\":{\"name\":\"Level\",\"type\":\"Node2D\",\"children\":[{\"name\":\"Hero\",\"type\":\"CharacterBody2D\",\"script\":\"hero.gd\",\"properties\":{\"position\":\"Vector2\\(200, 400\\)\"},\"children\":[{\"name\":\"HeroVisual\",\"type\":\"Polygon2D\",\"properties\":{\"color\":\"Color\\(0.2, 0.7, 1, 1\\)\",\"polygon\":\"PackedVector2Array\\(-14, -22, 14, -22, 14, 22, -14, 22\\)\"}},{\"name\":\"HeroCol\",\"type\":\"CollisionShape2D\",\"shape\":\"ps\"},{\"name\":\"Camera2D\",\"type\":\"Camera2D\"}]},{\"name\":\"Floor\",\"type\":\"StaticBody2D\",\"properties\":{\"position\":\"Vector2\\(576, 600\\)\"},\"children\":[{\"name\":\"FloorCol\",\"type\":\"CollisionShape2D\",\"shape\":\"floor_s\"},{\"name\":\"FloorVis\",\"type\":\"Polygon2D\",\"properties\":{\"color\":\"Color\\(0.4, 0.4, 0.4, 1\\)\",\"polygon\":\"PackedVector2Array\\(-600, -20, 600, -20, 600, 20, -600, 20\\)\"}}]},{\"name\":\"Coin\",\"type\":\"Area2D\",\"script\":\"coin.gd\",\"properties\":{\"position\":\"Vector2\\(400, 350\\)\"},\"children\":[{\"name\":\"CoinVis\",\"type\":\"Polygon2D\",\"properties\":{\"color\":\"Color\\(1, 0.85, 0, 1\\)\",\"polygon\":\"PackedVector2Array\\(-10, -10, 10, -10, 10, 10, -10, 10\\)\"}}]}]},\"connections\":[{\"signal\":\"body_entered\",\"from\":\"Coin\",\"to\":\".\",\"method\":\"_on_coin_collected\"}]}' | playgen --project /tmp/test-v2 build - 2>&1)",
+      "Bash(playgen --project /tmp/test-v2 scene tree level 2>&1)",
+      "Bash(playgen --project /tmp/test-v2 signal list level 2>&1)",
+      "Bash(playgen --project /tmp/test-v2 analyze --scene level --json-output 2>&1)",
+      "Bash(playgen --project /tmp/test-v2 node add level -n Enemy -t Area2D -p \".\" --script enemy.gd --shape CircleShape2D:30 2>&1)",
+      "Bash(playgen --project /tmp/test-v2 node set level -n Enemy -P \"position=Vector2\\(500, 400\\)\" -P \"modulate=Color\\(1, 0, 0, 1\\)\" 2>&1)",
+      "Bash(playgen --project /tmp/test-v2 analyze 2>&1)",
+      "Bash(mkdir -p /tmp/test-v3 && playgen --project /tmp/test-v3 init --name TestV3 2>&1)",
+      "Bash(playgen --project /tmp/test-v3 node add main -n GreenKey -t Area2D -p \".\" --shape CircleShape2D:12 --group keys --group collectibles 2>&1)",
+      "Bash(playgen --project /tmp/test-v3 scene tree main 2>&1)",
+      "Bash(playgen --project /tmp/test-v3 node set main -n GreenKey -P \"key_id=red\" -P \"position=Vector2\\(100, 200\\)\" -P \"speed=300\" -P \"visible=true\" 2>&1)",
+      "Bash(playgen --project /tmp/test-v3 node list main --json-output 2>&1)",
+      "Bash(rm -rf /tmp/test-v3 && mkdir -p /tmp/test-v3 && playgen --project /tmp/test-v3 init --name TestV3 2>&1)",
+      "Bash(playgen --project /tmp/test-v3 node add main -n GreenKey -t Sprite2D -p \".\" -g keys -g collectibles --json-output 2>&1)",
+      "Bash(playgen --project /tmp/test-v3 node set main -n GreenKey -P \"key_id=red\" 2>&1)",
+      "Bash(wc:*)",
+      "Bash(python:*)",
+      "Read(//tmp/**)",
+      "Bash(playgen autoload:*)",
+      "Bash(cd:*)"
+    ]
+  }
+}
