@@ -32,146 +32,149 @@ extends SceneTree
 
 ## PlayGen Engine Bridge - runs inside Godot headless mode.
 ## Reads a command JSON, executes it, writes result JSON.
+##
+## Compatible with Godot 4.3+ (including 4.6.x).
+## Variable names avoid shadowing built-in class names.
 
 func _init() -> void:
-	var args := OS.get_cmdline_user_args()
-	var cmd_file := ""
-	var result_file := ""
-	for i in range(args.size()):
-		if args[i] == "--cmd" and i + 1 < args.size():
-			cmd_file = args[i + 1]
-		elif args[i] == "--result" and i + 1 < args.size():
-			result_file = args[i + 1]
+	var user_args: PackedStringArray = OS.get_cmdline_user_args()
+	var cmd_file_path: String = ""
+	var result_file_path: String = ""
+	for i in range(user_args.size()):
+		if user_args[i] == "--cmd" and i + 1 < user_args.size():
+			cmd_file_path = user_args[i + 1]
+		elif user_args[i] == "--result" and i + 1 < user_args.size():
+			result_file_path = user_args[i + 1]
 
-	if cmd_file == "" or result_file == "":
-		_write_result(result_file, {"error": "Missing --cmd or --result args"})
+	if cmd_file_path == "" or result_file_path == "":
+		_write_result(result_file_path, {"error": "Missing --cmd or --result args"})
 		quit(1)
 		return
 
-	var cmd_text := FileAccess.get_file_as_string(cmd_file)
+	var cmd_text: String = FileAccess.get_file_as_string(cmd_file_path)
 	if cmd_text == "":
-		_write_result(result_file, {"error": "Cannot read command file"})
+		_write_result(result_file_path, {"error": "Cannot read command file"})
 		quit(1)
 		return
 
-	var json := JSON.new()
-	var err := json.parse(cmd_text)
-	if err != OK:
-		_write_result(result_file, {"error": "Invalid JSON: " + json.get_error_message()})
+	var json_parser: JSON = JSON.new()
+	var parse_err: int = json_parser.parse(cmd_text)
+	if parse_err != OK:
+		_write_result(result_file_path, {"error": "Invalid JSON: " + json_parser.get_error_message()})
 		quit(1)
 		return
 
-	var cmd: Dictionary = json.data
+	var cmd: Dictionary = json_parser.data
 	var action: String = cmd.get("action", "")
-	var result := {}
+	var out: Dictionary = {}
 
 	match action:
 		"validate_scene":
-			result = _validate_scene(cmd)
+			out = _validate_scene(cmd)
 		"read_scene_tree":
-			result = _read_scene_tree(cmd)
+			out = _read_scene_tree(cmd)
 		"validate_resources":
-			result = _validate_resources(cmd)
+			out = _validate_resources(cmd)
 		"read_project_info":
-			result = _read_project_info()
+			out = _read_project_info()
 		"validate_script":
-			result = _validate_script(cmd)
+			out = _validate_script(cmd)
 		"list_node_types":
-			result = _list_node_types(cmd)
+			out = _list_node_types(cmd)
 		"get_class_properties":
-			result = _get_class_properties(cmd)
+			out = _get_class_properties(cmd)
 		_:
-			result = {"error": "Unknown action: " + action}
+			out = {"error": "Unknown action: " + action}
 
-	_write_result(result_file, result)
+	_write_result(result_file_path, out)
 	quit(0)
 
 
 func _validate_scene(cmd: Dictionary) -> Dictionary:
-	var scene_path: String = cmd.get("scene", "")
-	if scene_path == "":
+	var spath: String = cmd.get("scene", "")
+	if spath == "":
 		return {"error": "Missing 'scene' parameter"}
 
-	if not ResourceLoader.exists(scene_path):
-		return {"valid": false, "error": "Scene file not found: " + scene_path}
+	if not ResourceLoader.exists(spath):
+		return {"valid": false, "error": "Scene file not found: " + spath}
 
-	var scene := ResourceLoader.load(scene_path) as PackedScene
-	if scene == null:
-		return {"valid": false, "error": "Failed to load scene: " + scene_path}
+	var packed: PackedScene = ResourceLoader.load(spath) as PackedScene
+	if packed == null:
+		return {"valid": false, "error": "Failed to load scene: " + spath}
 
-	var state := scene.get_state()
-	var nodes := []
+	var state: SceneState = packed.get_state()
+	var node_list: Array = []
 	for i in range(state.get_node_count()):
-		var node_info := {
+		var node_info: Dictionary = {
 			"name": state.get_node_name(i),
-			"type": state.get_node_type(i) as String,
-			"path": state.get_node_path(i) as String,
+			"type": StringName(state.get_node_type(i)),
+			"path": String(state.get_node_path(i)),
 			"property_count": state.get_node_property_count(i),
 		}
-		var groups := state.get_node_groups(i)
-		if groups.size() > 0:
-			node_info["groups"] = []
-			for g in groups:
-				node_info["groups"].append(str(g))
-		nodes.append(node_info)
+		var grp: PackedStringArray = state.get_node_groups(i)
+		if grp.size() > 0:
+			var grp_arr: Array = []
+			for g in grp:
+				grp_arr.append(String(g))
+			node_info["groups"] = grp_arr
+		node_list.append(node_info)
 
 	return {
 		"valid": true,
-		"scene": scene_path,
+		"scene": spath,
 		"node_count": state.get_node_count(),
-		"nodes": nodes,
+		"nodes": node_list,
 		"connection_count": state.get_connection_count(),
 	}
 
 
 func _read_scene_tree(cmd: Dictionary) -> Dictionary:
-	var scene_path: String = cmd.get("scene", "")
-	if scene_path == "":
+	var spath: String = cmd.get("scene", "")
+	if spath == "":
 		return {"error": "Missing 'scene' parameter"}
 
-	var scene := ResourceLoader.load(scene_path) as PackedScene
-	if scene == null:
-		return {"error": "Failed to load scene: " + scene_path}
+	var packed: PackedScene = ResourceLoader.load(spath) as PackedScene
+	if packed == null:
+		return {"error": "Failed to load scene: " + spath}
 
-	var instance := scene.instantiate()
-	if instance == null:
+	var inst: Node = packed.instantiate()
+	if inst == null:
 		return {"error": "Failed to instantiate scene"}
 
-	var tree := _serialize_node(instance)
-	instance.queue_free()
-	return {"scene": scene_path, "tree": tree}
+	var tree_data: Dictionary = _serialize_node(inst)
+	inst.queue_free()
+	return {"scene": spath, "tree": tree_data}
 
 
-func _serialize_node(node: Node) -> Dictionary:
-	var result := {
-		"name": node.name as String,
-		"class": node.get_class(),
+func _serialize_node(nd: Node) -> Dictionary:
+	var d: Dictionary = {
+		"name": String(nd.name),
+		"class": nd.get_class(),
 	}
 
 	# Get relevant properties
-	var props := {}
-	for prop in node.get_property_list():
-		var name: String = prop["name"]
-		var usage: int = prop["usage"]
-		# Only include user-set / storage properties
-		if usage & PROPERTY_USAGE_STORAGE:
-			var val = node.get(name)
-			if val != null and name != "script":
-				props[name] = _serialize_value(val)
-	if props.size() > 0:
-		result["properties"] = props
+	var prop_dict: Dictionary = {}
+	for prop in nd.get_property_list():
+		var pname: String = prop["name"]
+		var pusage: int = prop["usage"]
+		if pusage & PROPERTY_USAGE_STORAGE:
+			var pval: Variant = nd.get(pname)
+			if pval != null and pname != "script":
+				prop_dict[pname] = _serialize_value(pval)
+	if prop_dict.size() > 0:
+		d["properties"] = prop_dict
 
 	# Get children
-	var children := []
-	for child in node.get_children():
-		children.append(_serialize_node(child))
-	if children.size() > 0:
-		result["children"] = children
+	var child_arr: Array = []
+	for child in nd.get_children():
+		child_arr.append(_serialize_node(child))
+	if child_arr.size() > 0:
+		d["children"] = child_arr
 
-	return result
+	return d
 
 
-func _serialize_value(val) -> String:
+func _serialize_value(val: Variant) -> String:
 	if val is Vector2:
 		return "Vector2(%s, %s)" % [val.x, val.y]
 	elif val is Vector3:
@@ -181,24 +184,25 @@ func _serialize_value(val) -> String:
 	elif val is Rect2:
 		return "Rect2(%s, %s, %s, %s)" % [val.position.x, val.position.y, val.size.x, val.size.y]
 	elif val is Resource:
-		return val.resource_path if val.resource_path != "" else str(val)
-	else:
+		if val.resource_path != "":
+			return val.resource_path
 		return str(val)
+	return str(val)
 
 
 func _validate_resources(cmd: Dictionary) -> Dictionary:
 	var paths: Array = cmd.get("paths", [])
-	var results := []
+	var res_list: Array = []
 	for p in paths:
-		var path: String = p as String
-		var valid := ResourceLoader.exists(path)
-		var info := {"path": path, "valid": valid}
-		if valid:
-			var res := ResourceLoader.load(path)
-			if res != null:
-				info["type"] = res.get_class()
-		results.append(info)
-	return {"resources": results}
+		var rpath: String = String(p)
+		var is_valid: bool = ResourceLoader.exists(rpath)
+		var info: Dictionary = {"path": rpath, "valid": is_valid}
+		if is_valid:
+			var loaded: Resource = ResourceLoader.load(rpath)
+			if loaded != null:
+				info["type"] = loaded.get_class()
+		res_list.append(info)
+	return {"resources": res_list}
 
 
 func _read_project_info() -> Dictionary:
@@ -211,56 +215,56 @@ func _read_project_info() -> Dictionary:
 
 
 func _validate_script(cmd: Dictionary) -> Dictionary:
-	var script_path: String = cmd.get("script", "")
-	if script_path == "":
+	var spath: String = cmd.get("script", "")
+	if spath == "":
 		return {"error": "Missing 'script' parameter"}
 
-	if not ResourceLoader.exists(script_path):
+	if not ResourceLoader.exists(spath):
 		return {"valid": false, "error": "Script file not found"}
 
-	var script := ResourceLoader.load(script_path) as Script
-	if script == null:
+	var loaded_script: Script = ResourceLoader.load(spath) as Script
+	if loaded_script == null:
 		return {"valid": false, "error": "Failed to load script"}
 
 	return {
-		"valid": script.can_instantiate(),
-		"script": script_path,
-		"base_type": script.get_instance_base_type(),
+		"valid": loaded_script.can_instantiate(),
+		"script": spath,
+		"base_type": loaded_script.get_instance_base_type(),
 	}
 
 
 func _list_node_types(cmd: Dictionary) -> Dictionary:
-	var base: String = cmd.get("base", "Node")
-	var types := ClassDB.get_inheriters_from_class(base)
-	var result := []
-	for t in types:
+	var base_class: String = cmd.get("base", "Node")
+	var type_list: PackedStringArray = ClassDB.get_inheriters_from_class(base_class)
+	var out_list: Array = []
+	for t in type_list:
 		if ClassDB.can_instantiate(t):
-			result.append(t as String)
-	result.sort()
-	return {"base": base, "types": result}
+			out_list.append(String(t))
+	out_list.sort()
+	return {"base": base_class, "types": out_list}
 
 
 func _get_class_properties(cmd: Dictionary) -> Dictionary:
-	var class_name: String = cmd.get("class_name", "")
-	if class_name == "" or not ClassDB.class_exists(class_name):
-		return {"error": "Unknown class: " + class_name}
+	var cname: String = cmd.get("class_name", "")
+	if cname == "" or not ClassDB.class_exists(cname):
+		return {"error": "Unknown class: " + cname}
 
-	var props := []
-	for prop in ClassDB.class_get_property_list(class_name):
-		var name: String = prop["name"]
-		var type_id: int = prop["type"]
-		var usage: int = prop["usage"]
-		if usage & PROPERTY_USAGE_EDITOR:
-			props.append({
-				"name": name,
-				"type": type_id,
-				"type_name": _type_name(type_id),
+	var prop_list: Array = []
+	for prop in ClassDB.class_get_property_list(cname):
+		var pname: String = prop["name"]
+		var ptype: int = prop["type"]
+		var pusage: int = prop["usage"]
+		if pusage & PROPERTY_USAGE_EDITOR:
+			prop_list.append({
+				"name": pname,
+				"type": ptype,
+				"type_name": _type_name(ptype),
 			})
-	return {"class": class_name, "properties": props}
+	return {"class": cname, "properties": prop_list}
 
 
-func _type_name(type_id: int) -> String:
-	match type_id:
+func _type_name(tid: int) -> String:
+	match tid:
 		TYPE_BOOL: return "bool"
 		TYPE_INT: return "int"
 		TYPE_FLOAT: return "float"
@@ -276,13 +280,13 @@ func _type_name(type_id: int) -> String:
 		_: return "Variant"
 
 
-func _write_result(path: String, data: Dictionary) -> void:
-	if path == "":
+func _write_result(fpath: String, data: Dictionary) -> void:
+	if fpath == "":
 		return
-	var file := FileAccess.open(path, FileAccess.WRITE)
-	if file:
-		file.store_string(JSON.stringify(data, "\t"))
-		file.close()
+	var f: FileAccess = FileAccess.open(fpath, FileAccess.WRITE)
+	if f:
+		f.store_string(JSON.stringify(data, "\t"))
+		f.close()
 '''
 
 

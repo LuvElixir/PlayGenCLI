@@ -3,10 +3,40 @@
 from __future__ import annotations
 
 import json
+import re
 
 import click
 
 from playgen.godot.project_file import load_project, save_project
+
+
+# Patterns for values that should NOT be auto-quoted in project.godot
+_NO_QUOTE_CONFIG = [
+    re.compile(r"^-?\d+(\.\d+)?$"),                     # Numbers
+    re.compile(r"^0x[0-9a-fA-F]+$"),                     # Hex
+    re.compile(r"^(true|false|null)$"),                   # Keywords
+    re.compile(r"^(Vector[234i]?|Color|Rect2i?|Transform[23]D)\("),  # Constructors
+    re.compile(r"^Packed(String|Vector|Int|Float|Byte|Color)"),       # Packed arrays
+    re.compile(r'^".*"$'),                                # Already quoted
+    re.compile(r"^\["),                                   # Arrays
+    re.compile(r"^\{"),                                   # Dicts
+    re.compile(r'^&"'),                                   # StringName
+    re.compile(r'^\^"'),                                  # NodePath
+    re.compile(r'^SubResource\('),                        # SubResource
+    re.compile(r'^ExtResource\('),                        # ExtResource
+]
+
+
+def _auto_quote_config_value(value: str) -> str:
+    """Auto-quote a project.godot value if it looks like a plain string.
+
+    Numbers, booleans, constructors, arrays, dicts, and already-quoted
+    strings are left as-is. Everything else gets quoted.
+    """
+    for pattern in _NO_QUOTE_CONFIG:
+        if pattern.match(value):
+            return value
+    return f'"{value}"'
 
 
 @click.group("config")
@@ -49,13 +79,14 @@ def config_set(ctx: click.Context, key: str, value: str, section: str | None, as
             return
         section, key = parts[0], parts[1]
 
-    proj.set(section, key, value)
+    quoted_value = _auto_quote_config_value(value)
+    proj.set(section, key, quoted_value)
     save_project(proj, project_path)
 
     if as_json:
-        click.echo(json.dumps({"section": section, "key": key, "value": value}))
+        click.echo(json.dumps({"section": section, "key": key, "value": quoted_value}))
     else:
-        click.echo(f"Set [{section}] {key} = {value}")
+        click.echo(f"Set [{section}] {key} = {quoted_value}")
 
 
 @config_cmd.command("get")

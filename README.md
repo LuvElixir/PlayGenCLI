@@ -90,6 +90,21 @@ PlayGenCLI uses a **hybrid execution model**:
 
 ## Changelog
 
+### v0.5.1 — 2026-03-16
+
+Bug fixes based on 迷宫饭 MVP real-world development feedback. All 4 P0 blockers resolved.
+
+**P0 Fixes:**
+- **build scripts.body now writes to file** — Build JSON `scripts` section now accepts both `"body"` and `"content"` keys for inline script content. Previously only `"content"` worked, causing `"body"` content to be silently dropped.
+- **bridge.gd Godot 4.6.1 compatibility** — Rewrote bridge GDScript to use explicit type annotations and avoid variable names that shadow built-in classes (`json` → `json_parser`, `err` → `parse_err`, etc.). All bridge commands now work on Godot 4.3+.
+- **config set auto-quotes string values** — `playgen config set application/config/name "My Game"` now correctly writes `"My Game"` (with quotes) to project.godot. Numbers, booleans, constructors, and already-quoted values are left as-is. Same fix applied to build command's `config` section.
+- **build properties accept non-string JSON values** — Node `properties` in build JSON now accept native JSON types: `"wait_time": 3.0`, `"autostart": true`, `"speed": 300`. Previously these caused `TypeError`.
+
+**P1 Fixes:**
+- **run error reporting shows full details** — `playgen run` now always displays Godot stderr output (up to 20 lines) when errors occur, instead of hiding it. Error messages include file path and line number.
+- **analyze excludes .playgen directory** — Snapshot files and bridge scripts in `.playgen/` no longer pollute `playgen analyze` output.
+- **build output shows full file paths** — Build success message now lists all created files with their full filesystem paths, not just filenames.
+
 ### v0.5.0 — 2026-03-16
 
 From "CLI tool" to "Agent execution layer" — PlayGenCLI gains the three capabilities most needed for Agent-driven prototype closure: asset pipeline, engine-native bridge, and runtime observation. Plus snapshot/rollback for multi-step safety.

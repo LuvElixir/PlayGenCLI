@@ -133,18 +133,25 @@ def run_cmd(
                 for err in result.errors:
                     loc = ""
                     if "file" in err:
-                        loc = f"  {err['file']}"
+                        loc = f" at {err['file']}"
                         if "line" in err:
                             loc += f":{err['line']}"
-                    click.echo(f"  {err['message']}{loc}")
+                    click.echo(f"  {err.get('message', 'Unknown error')}{loc}")
 
             if result.warnings:
                 click.echo(f"\nWarnings ({len(result.warnings)}):")
                 for w in result.warnings:
                     click.echo(f"  {w}")
 
-            if result.stderr and not result.errors:
-                click.echo(f"\nStderr output:\n{result.stderr[:1000]}")
+            # Always show stderr when there are errors (gives more context)
+            if result.stderr:
+                stderr_lines = [l for l in result.stderr.strip().split("\n") if l.strip()]
+                if stderr_lines:
+                    click.echo(f"\nGodot output ({len(stderr_lines)} lines):")
+                    for line in stderr_lines[:20]:
+                        click.echo(f"  {line.rstrip()}")
+                    if len(stderr_lines) > 20:
+                        click.echo(f"  ... ({len(stderr_lines) - 20} more lines)")
 
             # Print telemetry summary
             if observe and telemetry_path and not check_only:

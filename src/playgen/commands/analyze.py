@@ -41,9 +41,10 @@ def analyze_cmd(ctx: click.Context, scene: str | None, as_json: bool) -> None:
 def _analyze_project(project_path: Path, as_json: bool) -> None:
     proj = load_project(project_path)
 
-    # Collect scenes
+    # Collect scenes (exclude .godot and .playgen internal dirs)
+    _EXCLUDE_DIRS = {".godot", ".playgen"}
     scene_files = sorted(project_path.rglob("*.tscn"))
-    scene_files = [s for s in scene_files if ".godot" not in s.parts]
+    scene_files = [s for s in scene_files if not _EXCLUDE_DIRS & set(s.relative_to(project_path).parts)]
 
     scenes_info = []
     for sf in scene_files:
@@ -81,7 +82,7 @@ def _analyze_project(project_path: Path, as_json: bool) -> None:
 
     # Collect scripts
     script_files = sorted(project_path.rglob("*.gd"))
-    script_files = [s for s in script_files if ".godot" not in s.parts]
+    script_files = [s for s in script_files if not _EXCLUDE_DIRS & set(s.relative_to(project_path).parts)]
 
     scripts_info = []
     for sf in script_files:
@@ -110,7 +111,7 @@ def _analyze_project(project_path: Path, as_json: bool) -> None:
 
     # Collect other resources
     resource_files = sorted(project_path.rglob("*.tres"))
-    resource_files = [r for r in resource_files if ".godot" not in r.parts]
+    resource_files = [r for r in resource_files if not _EXCLUDE_DIRS & set(r.relative_to(project_path).parts)]
     resources_info = [
         {"path": str(r.relative_to(project_path)).replace("\\", "/")}
         for r in resource_files
