@@ -25,8 +25,8 @@ def init_cmd(ctx: click.Context, name: str | None, template: str, list_templates
     """Initialize a new Godot 4.x project.
 
     Creates project structure with scenes, scripts, and configuration
-    based on the selected template. Run from the target directory or
-    use --project to specify path.
+    based on the selected template. Run from the target directory, or
+    pass --project to the top-level playgen command to specify path.
     """
     if list_templates:
         if as_json:

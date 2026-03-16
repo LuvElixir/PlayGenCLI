@@ -424,10 +424,67 @@ def validate_resources(project_path: Path, paths: list[str], **kwargs) -> Bridge
 
 
 def validate_script(project_path: Path, script: str, **kwargs) -> BridgeResult:
-    """Validate a GDScript file using the Godot parser."""
+    """Validate a GDScript file using the Godot parser.
+
+    Also checks for autoload references that won't be available in headless mode.
+    """
     if not script.startswith("res://"):
         script = f"res://{script}"
-    return run_bridge(project_path, "validate_script", {"script": script}, **kwargs)
+
+    result = run_bridge(project_path, "validate_script", {"script": script}, **kwargs)
+
+    # Post-validation: check for autoload dependencies
+    if result.success:
+        warnings = _check_autoload_refs(project_path, script)
+        if warnings:
+            result.data["autoload_warnings"] = warnings
+
+    return result
+
+
+def _check_autoload_refs(project_path: Path, res_path: str) -> list[str]:
+    """Check if a script references autoload singletons.
+
+    Autoloads are globals in Godot but aren't loaded in headless bridge mode,
+    so validate-script may give false positives. Warn the user.
+    """
+    # Get script file path
+    rel = res_path.replace("res://", "")
+    script_file = project_path / rel
+    if not script_file.exists():
+        return []
+
+    # Get autoload names from project.godot
+    try:
+        from playgen.godot.project_file import load_project
+        proj = load_project(project_path)
+        autoloads = set(proj.sections.get("autoload", {}).keys())
+    except Exception:
+        return []
+
+    if not autoloads:
+        return []
+
+    # Scan script source for autoload references
+    source = script_file.read_text(encoding="utf-8")
+    found: list[str] = []
+    for name in autoloads:
+        # Look for the autoload name used as an identifier (not in comments/strings)
+        for line in source.split("\n"):
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue
+            if name in stripped:
+                found.append(name)
+                break
+
+    if found:
+        return [
+            f"Script references autoload(s): {', '.join(sorted(found))}. "
+            "These are not loaded in headless validation mode — "
+            "validation result may be a false positive."
+        ]
+    return []
 
 
 def read_project_info(project_path: Path, **kwargs) -> BridgeResult:

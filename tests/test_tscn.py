@@ -83,6 +83,27 @@ class TestAutoQuoteValue:
         assert auto_quote_value('Array(["a"])') == 'Array(["a"])'
         assert auto_quote_value('Dictionary({})') == 'Dictionary({})'
 
+    @pytest.mark.parametrize("value", [
+        "Color.RED", "Color.BLUE", "Color.WHITE", "Color.BLACK",
+        "Color.TRANSPARENT", "Color.GREEN_YELLOW",
+        "Vector2.ZERO", "Vector2.ONE", "Vector2.UP", "Vector2.DOWN",
+        "Vector2.LEFT", "Vector2.RIGHT", "Vector2.INF",
+        "Vector3.ZERO", "Vector3.ONE", "Vector3.UP", "Vector3.FORWARD",
+        "Vector3.BACK", "Vector3.LEFT", "Vector3.RIGHT",
+        "Vector2i.ZERO", "Vector2i.ONE",
+        "Vector3i.ZERO", "Vector3i.ONE",
+        "Vector4.ZERO", "Vector4.ONE",
+        "Quaternion.IDENTITY",
+        "Basis.IDENTITY",
+        "Transform2D.IDENTITY",
+        "Transform3D.IDENTITY",
+        "Plane.PLANE_XY",
+        "Rect2.ZERO",
+    ])
+    def test_no_quote_named_constants(self, value):
+        """Type.CONSTANT named constants must NOT be quoted."""
+        assert auto_quote_value(value) == value
+
     # SHOULD be quoted
     @pytest.mark.parametrize("value,expected", [
         ("hello", '"hello"'),

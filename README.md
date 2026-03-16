@@ -57,6 +57,7 @@ playgen doctor                           # Check for issues
 | **System** | |
 | `playgen run` | Run project via Godot CLI, capture output |
 | `playgen run --observe` | Run with runtime telemetry (positions, collisions, events) |
+| `playgen run --screenshot N` | Capture screenshot after N frames |
 | `playgen doctor` | Diagnose and fix common issues |
 
 All commands support `--json-output` for machine-readable output, making them suitable for any AI Agent.
@@ -72,6 +73,8 @@ PlayGenCLI uses a **hybrid execution model**:
 
 - **Asset pipeline**: `asset import` + `asset attach` lets Agents wire images, audio, and fonts into scenes without manual editor interaction
 - **Engine-native bridge**: Godot headless mode provides authoritative validation and introspection beyond text parsing
+- **Visibility checking**: `build` auto-detects invisible nodes (physics bodies without visual children) — the #1 cause of "commands succeed but nothing on screen"
+- **Screenshot capture**: `run --screenshot 60` captures the viewport after 60 frames — Agent or human can verify visual result
 - **Runtime observation**: `run --observe` injects telemetry autoload that captures node positions, collisions, scene changes, and custom events — structured JSON feedback for the Agent
 - **Snapshot/rollback**: `snapshot save/restore` enables safe multi-step operations with rollback on failure
 - **`build` command**: Agent outputs one JSON, gets a complete runnable scene — with `--snapshot` safety net and `--validate` engine check
@@ -88,7 +91,80 @@ PlayGenCLI uses a **hybrid execution model**:
 
 ---
 
+## Agent Prompt Guide
+
+See [AGENT_GUIDE.md](AGENT_GUIDE.md) for a comprehensive guide on how to use PlayGenCLI effectively as an AI Agent. Covers: build JSON schema, all shorthands, script templates, recommended workflow, common patterns, and debugging checklist.
+
 ## Changelog
+
+### v0.7.0 — 2026-03-16
+
+**Build intelligence** — the build command now actively prevents the #1 Agent failure mode instead of just warning about it.
+
+**Auto-visual placeholders:**
+- Body types (`CharacterBody2D`, `Area2D`, `StaticBody2D`, `RigidBody2D`, + 3D) without visual children now automatically get a colored `Polygon2D` placeholder
+- Each body node gets a different color from an 8-color palette for easy identification
+- Placeholder size matches the collision shape if one is provided
+- Build output includes `auto_visuals` array listing which nodes got placeholders
+- Agent should replace placeholders with real `Sprite2D` + texture when assets are available
+
+**Type inference:**
+- Omitting `"type"` in build JSON now infers from context: `"texture"` → `Sprite2D`, `"audio"` → `AudioStreamPlayer`, `"text"` → `Label`
+- Explicit `"type"` always takes precedence
+
+**New shorthands:**
+- `"text"` — Sets text property on Label/Button nodes: `{"name": "Title", "text": "Game Over"}`
+- `"color"` — Sets color (Polygon2D, ColorRect) or modulate (other nodes): `"color": "Color(1, 0, 0, 1)"`
+- `"size"` — Sets custom_minimum_size on Control nodes: `"size": [200, 100]`
+- `"collision_layer"` / `"collision_mask"` — Accept integer bitmask or list of layer numbers: `"collision_layer": [1, 3]`
+
+**Template variables:**
+- Script templates now support `"vars"` for customizing constants: `{"template": "platformer-player", "vars": {"SPEED": "500.0"}}`
+- `platformer-player`: SPEED, JUMP_VELOCITY
+- `topdown-player`: SPEED
+- Unset vars use sensible defaults
+
+**Agent Prompt Guide:**
+- New `AGENT_GUIDE.md` with complete reference for Agent integration
+- Covers: build JSON schema, all shorthands, script templates, recommended workflow, common patterns, debugging checklist
+
+### v0.6.0 — 2026-03-16
+
+**Closing the feedback loop** — the #1 Agent failure mode is "20 commands succeed but nothing appears on screen." v0.6.0 adds visibility detection and screenshot capture to let Agents verify their work.
+
+**Visibility check** (`analyze --check-visibility` + auto in `build`):
+- Detects physics nodes (CharacterBody2D, Area2D, etc.) without visual children (Sprite2D, Polygon2D, MeshInstance, etc.)
+- `build` now **automatically warns** about invisible nodes in every build output — Agent gets immediate feedback
+- Checks instance file existence and script file existence
+- Covers 2D + 3D: Sprite2D, AnimatedSprite2D, Polygon2D, MeshInstance3D, CSG shapes, Labels, UI controls, etc.
+- Example: `[!!] Enemy (CharacterBody2D) — No visual child node (needs Sprite2D, Polygon2D, ...)`
+
+**Screenshot capture** (`run --screenshot N`):
+- `playgen run --screenshot 60` — runs the game, captures viewport after 60 frames, saves PNG
+- Can combine with `--observe` for screenshot + telemetry
+- Autoload injection/cleanup pattern (same as observer)
+- Agent or human can inspect the screenshot to verify visual result
+
+### v0.5.2 — 2026-03-16
+
+Bug fixes and improvements based on Shadow Harvest (2D action roguelike) real-world testing feedback.
+
+**P0 Fixes:**
+- **build always outputs error info** — `build` with invalid JSON now outputs error to stdout (not just stderr), so Agents always see failure info. Exit code is reliably non-zero on errors.
+- **input add supports mouse/joypad** — New `--mouse/-m` and `--joypad/-j` options: `playgen input add shoot -m left -j x`. Mouse names: left, right, middle, wheel_up, wheel_down. Joypad names: a, b, x, y, lb, rb, start, select.
+- **validate-script warns about autoload dependencies** — `bridge validate-script` now detects when a script references autoload singletons and adds warnings, since autoloads aren't loaded in headless validation mode.
+
+**P1 Fixes:**
+- **init help text corrected** — Docstring no longer claims `--project` is on init (it's a top-level CLI option).
+- **CharacterBody2D template is game-type neutral** — Default template now generates basic movement with `move_and_slide()` without assuming platformer gravity/jump. Use `--template platformer-player` for platformer-specific code.
+- **node set/find supports node paths** — `find_node()` and commands using it now accept path format like `HUD/HealthLabel` for sub-node access.
+- **scene tree shows instance sources** — Instance nodes now display `(instance=res://enemy.tscn)` instead of empty `()`.
+- **script attach warns on missing file** — Warns when the script file doesn't exist on disk (JSON output includes `"warning"` key).
+- **signal connect warns about instance targets** — Connecting to an instanced node now warns that the method must exist in the instanced scene's script.
+- **analyze recognizes autoload scripts** — Scripts registered as autoloads now show `(autoload: GameManager)` instead of `(unused)`.
+
+**P2 Fixes:**
+- **scene create outputs root node name** — `scene create light_orb.tscn` now shows `Created scene: light_orb.tscn (root: LightOrb [Area2D])`. JSON output includes `root_name`.
 
 ### v0.5.1 — 2026-03-16
 

@@ -63,6 +63,15 @@ def signal_connect(
                 click.echo(f"Warning: {msg}")
             return
 
+    # Check if target is an instance node (method may need to be on the instanced scene's script)
+    warnings: list[str] = []
+    to_target = scene_obj.find_node(to_node) if to_node != "." else scene_obj.get_root()
+    if to_target and to_target.instance_id and "script" not in to_target.properties:
+        warnings.append(
+            f"'{to_node}' is an instanced scene — ensure the method '{method}' "
+            "exists in the instanced scene's script, not in this scene."
+        )
+
     scene_obj.connections.append(Connection(
         signal_name=signal_name,
         from_node=from_node,
@@ -73,16 +82,21 @@ def signal_connect(
     scene_path.write_text(write_tscn(scene_obj), encoding="utf-8")
 
     if as_json:
-        click.echo(json.dumps({
+        result = {
             "connected": True,
             "signal": signal_name,
             "from": from_node,
             "to": to_node,
             "method": method,
             "scene": scene,
-        }))
+        }
+        if warnings:
+            result["warnings"] = warnings
+        click.echo(json.dumps(result))
     else:
         click.echo(f"Connected: {from_node}.{signal_name} -> {to_node}.{method}()")
+        for w in warnings:
+            click.echo(f"  Warning: {w}", err=True)
 
 
 @signal_cmd.command("list")

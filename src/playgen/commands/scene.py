@@ -41,15 +41,16 @@ def scene_create(ctx: click.Context, name: str, root_type: str, as_json: bool) -
         return
 
     scene = Scene()
-    scene.add_node(name.replace(".tscn", "").title().replace("_", ""), root_type)
+    root_name = name.replace(".tscn", "").title().replace("_", "")
+    scene.add_node(root_name, root_type)
 
     scene_path.parent.mkdir(parents=True, exist_ok=True)
     scene_path.write_text(write_tscn(scene), encoding="utf-8")
 
     if as_json:
-        click.echo(json.dumps({"created": name, "root_type": root_type}))
+        click.echo(json.dumps({"created": name, "root_type": root_type, "root_name": root_name}))
     else:
-        click.echo(f"Created scene: {name} (root: {root_type})")
+        click.echo(f"Created scene: {name} (root: {root_name} [{root_type}])")
 
 
 @scene_cmd.command("tree")
@@ -98,7 +99,17 @@ def _print_tree(scene: Scene, indent: str = "") -> None:
         if node.groups:
             tags.append(f"groups: {', '.join(node.groups)}")
         tag_str = f" [{'; '.join(tags)}]" if tags else ""
-        click.echo(f"{prefix}{connector} {node.name} ({node.type}){tag_str}")
+        # Show instance source when type is empty (instanced nodes)
+        type_display = node.type
+        if not type_display and node.instance_id:
+            # Find the ext_resource to show the instance source
+            for r in scene.ext_resources:
+                if r.id == node.instance_id:
+                    type_display = f"instance={r.path}"
+                    break
+            if not type_display:
+                type_display = "instance"
+        click.echo(f"{prefix}{connector} {node.name} ({type_display}){tag_str}")
 
         # Find children
         node_path = scene.get_node_path(node)
@@ -121,7 +132,13 @@ def _print_tree(scene: Scene, indent: str = "") -> None:
     if root.groups:
         tags.append(f"groups: {', '.join(root.groups)}")
     tag_str = f" [{'; '.join(tags)}]" if tags else ""
-    click.echo(f"{root.name} ({root.type}){tag_str}")
+    root_type = root.type
+    if not root_type and root.instance_id:
+        for r in scene.ext_resources:
+            if r.id == root.instance_id:
+                root_type = f"instance={r.path}"
+                break
+    click.echo(f"{root.name} ({root_type}){tag_str}")
 
     # Find root's children (parent=".")
     children = [n for n in scene.nodes if n.parent == "."]
