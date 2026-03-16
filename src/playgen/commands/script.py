@@ -110,6 +110,15 @@ def script_attach(ctx: click.Context, scene: str, node: str, script_path: str, a
     else:
         res_path = script_path
 
+    # Warn if script file doesn't exist
+    script_file_path = project_path / res_path.replace("res://", "")
+    if not script_file_path.exists():
+        warning = f"Warning: script file '{script_path}' does not exist. Create it with 'playgen script create'."
+        if as_json:
+            pass  # will include in output
+        else:
+            click.echo(warning, err=True)
+
     scene_obj = parse_tscn(scene_file.read_text(encoding="utf-8"))
     target = scene_obj.find_node(node)
     if not target:
@@ -127,8 +136,11 @@ def script_attach(ctx: click.Context, scene: str, node: str, script_path: str, a
 
     scene_file.write_text(write_tscn(scene_obj), encoding="utf-8")
 
+    result = {"attached": script_path, "to_node": node, "scene": scene}
+    if not script_file_path.exists():
+        result["warning"] = f"Script file '{script_path}' does not exist"
     if as_json:
-        click.echo(json.dumps({"attached": script_path, "to_node": node, "scene": scene}))
+        click.echo(json.dumps(result))
     else:
         click.echo(f"Attached {script_path} to node '{node}' in {scene}")
 

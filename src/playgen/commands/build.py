@@ -320,6 +320,9 @@ def build_cmd(ctx: click.Context, source: str, as_json: bool, dry_run: bool, sna
             click.echo(f"  Files ({len(created_files)}):")
             for f in created_files:
                 click.echo(f"    {project_path / f}")
+        if errors:
+            for e in errors:
+                click.echo(f"  Warning: {e}", err=True)
 
 
 def _configure_project(data: dict, project_path: Path, errors: list[str], dry_run: bool) -> None:
@@ -379,5 +382,7 @@ def _error(msg: str, as_json: bool, ctx: click.Context) -> None:
     if as_json:
         click.echo(json.dumps({"error": msg}))
     else:
+        # Output to both stdout (for Agent capture) and stderr (for humans)
+        click.echo(f"Error: {msg}")
         click.echo(f"Error: {msg}", err=True)
     ctx.exit(1)

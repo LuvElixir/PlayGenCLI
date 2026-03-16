@@ -1,4 +1,4 @@
-# PlayGen CLI (v0.5.1)
+# PlayGen CLI (v0.5.2)
 
 Agent execution layer for Godot 4.x. Lets AI Agents go from idea to playable prototype by providing a complete, closable, observable, and recoverable control plane over Godot projects.
 

@@ -90,6 +90,27 @@ PlayGenCLI uses a **hybrid execution model**:
 
 ## Changelog
 
+### v0.5.2 — 2026-03-16
+
+Bug fixes and improvements based on Shadow Harvest (2D action roguelike) real-world testing feedback.
+
+**P0 Fixes:**
+- **build always outputs error info** — `build` with invalid JSON now outputs error to stdout (not just stderr), so Agents always see failure info. Exit code is reliably non-zero on errors.
+- **input add supports mouse/joypad** — New `--mouse/-m` and `--joypad/-j` options: `playgen input add shoot -m left -j x`. Mouse names: left, right, middle, wheel_up, wheel_down. Joypad names: a, b, x, y, lb, rb, start, select.
+- **validate-script warns about autoload dependencies** — `bridge validate-script` now detects when a script references autoload singletons and adds warnings, since autoloads aren't loaded in headless validation mode.
+
+**P1 Fixes:**
+- **init help text corrected** — Docstring no longer claims `--project` is on init (it's a top-level CLI option).
+- **CharacterBody2D template is game-type neutral** — Default template now generates basic movement with `move_and_slide()` without assuming platformer gravity/jump. Use `--template platformer-player` for platformer-specific code.
+- **node set/find supports node paths** — `find_node()` and commands using it now accept path format like `HUD/HealthLabel` for sub-node access.
+- **scene tree shows instance sources** — Instance nodes now display `(instance=res://enemy.tscn)` instead of empty `()`.
+- **script attach warns on missing file** — Warns when the script file doesn't exist on disk (JSON output includes `"warning"` key).
+- **signal connect warns about instance targets** — Connecting to an instanced node now warns that the method must exist in the instanced scene's script.
+- **analyze recognizes autoload scripts** — Scripts registered as autoloads now show `(autoload: GameManager)` instead of `(unused)`.
+
+**P2 Fixes:**
+- **scene create outputs root node name** — `scene create light_orb.tscn` now shows `Created scene: light_orb.tscn (root: LightOrb [Area2D])`. JSON output includes `root_name`.
+
 ### v0.5.1 — 2026-03-16
 
 Bug fixes based on 迷宫饭 MVP real-world development feedback. All 4 P0 blockers resolved.

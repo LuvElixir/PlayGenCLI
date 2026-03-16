@@ -80,6 +80,14 @@ def _analyze_project(project_path: Path, as_json: bool) -> None:
             "sub_resources": sub_resources_list,
         })
 
+    # Get autoload scripts from project.godot
+    autoload_scripts: dict[str, str] = {}  # res_path -> autoload_name
+    autoload_section = proj.sections.get("autoload", {})
+    for al_name, al_value in autoload_section.items():
+        # Value format: "*res://script.gd" (with quotes and asterisk)
+        al_path = al_value.strip('"').lstrip("*")
+        autoload_scripts[al_path] = al_name
+
     # Collect scripts
     script_files = sorted(project_path.rglob("*.gd"))
     script_files = [s for s in script_files if not _EXCLUDE_DIRS & set(s.relative_to(project_path).parts)]
@@ -101,13 +109,16 @@ def _analyze_project(project_path: Path, as_json: bool) -> None:
             if res_path in si["scripts"]
         ]
 
-        scripts_info.append({
+        script_entry = {
             "path": rel,
             "res_path": res_path,
             "extends": extends,
             "used_in_scenes": used_in,
             "lines": len(content.split("\n")),
-        })
+        }
+        if res_path in autoload_scripts:
+            script_entry["autoload"] = autoload_scripts[res_path]
+        scripts_info.append(script_entry)
 
     # Collect other resources
     resource_files = sorted(project_path.rglob("*.tres"))
@@ -153,7 +164,12 @@ def _analyze_project(project_path: Path, as_json: bool) -> None:
 
         click.echo(f"\nScripts ({len(scripts_info)}):")
         for si in scripts_info:
-            used = f"  used in: {', '.join(si['used_in_scenes'])}" if si["used_in_scenes"] else "  (unused)"
+            if si["used_in_scenes"]:
+                used = f"  used in: {', '.join(si['used_in_scenes'])}"
+            elif si.get("autoload"):
+                used = f"  (autoload: {si['autoload']})"
+            else:
+                used = "  (unused)"
             click.echo(f"  {si['path']:30s} extends {si['extends']:20s}{used}")
 
         if resources_info:

@@ -165,36 +165,63 @@ def input_cmd() -> None:
 
 @input_cmd.command("add")
 @click.argument("action")
-@click.option("--key", "-k", "keys", multiple=True, required=True,
-              help="Key binding (repeatable, e.g., -k w -k up)")
+@click.option("--key", "-k", "keys", multiple=True,
+              help="Keyboard binding (repeatable, e.g., -k w -k up -k space)")
+@click.option("--mouse", "-m", "mouse_keys", multiple=True,
+              help="Mouse binding (repeatable, e.g., -m left -m right)")
+@click.option("--joypad", "-j", "joypad_keys", multiple=True,
+              help="Joypad binding (repeatable, e.g., -j a -j lb)")
 @click.option("--deadzone", "-d", default=0.2, help="Deadzone (default: 0.2)")
 @click.option("--json-output", "as_json", is_flag=True, help="Output as JSON")
 @click.pass_context
-def input_add(ctx: click.Context, action: str, keys: tuple[str, ...], deadzone: float, as_json: bool) -> None:
-    """Add an input action with key bindings.
+def input_add(ctx: click.Context, action: str, keys: tuple[str, ...],
+              mouse_keys: tuple[str, ...], joypad_keys: tuple[str, ...],
+              deadzone: float, as_json: bool) -> None:
+    """Add an input action with key/mouse/joypad bindings.
 
     ACTION is the action name (e.g., 'move_left', 'jump').
 
     \b
     Examples:
       playgen input add move_left -k a -k left
-      playgen input add move_right -k d -k right
-      playgen input add move_up -k w -k up
-      playgen input add move_down -k s -k down
-      playgen input add jump -k space
-      playgen input add attack -k mouse_left -k joypad_x
+      playgen input add jump -k space -j a
+      playgen input add shoot -m left -k z
+      playgen input add attack -k mouse_left -k joypad_x   # also works
+
+    \b
+    Mouse names: left, right, middle, wheel_up, wheel_down
+    Joypad names: a, b, x, y, lb, rb, start, select, up, down, left, right
     """
+    # Merge all binding sources into a single event list
+    all_bindings: list[str] = list(keys)
+    for mk in mouse_keys:
+        name = mk.lower()
+        if not name.startswith("mouse_"):
+            name = f"mouse_{name}"
+        all_bindings.append(name)
+    for jk in joypad_keys:
+        name = jk.lower()
+        if not name.startswith("joypad_"):
+            name = f"joypad_{name}"
+        all_bindings.append(name)
+
+    if not all_bindings:
+        click.echo("Error: at least one binding required (-k, -m, or -j)")
+        click.echo("Error: at least one binding required (-k, -m, or -j)", err=True)
+        ctx.exit(1)
+        return
+
     project_path = ctx.obj["project_path"]
     proj = load_project(project_path)
 
-    value = format_input_value(list(keys), deadzone)
+    value = format_input_value(all_bindings, deadzone)
     proj.set("input", action, value)
     save_project(proj, project_path)
 
     if as_json:
-        click.echo(json.dumps({"action": action, "keys": list(keys)}))
+        click.echo(json.dumps({"action": action, "bindings": all_bindings}))
     else:
-        click.echo(f"Input added: {action} -> [{', '.join(keys)}]")
+        click.echo(f"Input added: {action} -> [{', '.join(all_bindings)}]")
 
 
 @input_cmd.command("remove")

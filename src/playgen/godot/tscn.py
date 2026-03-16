@@ -96,6 +96,20 @@ class Scene:
         return None
 
     def find_node(self, name: str) -> SceneNode | None:
+        """Find a node by name or path (e.g., 'Player' or 'HUD/HealthLabel')."""
+        if "/" in name:
+            # Path lookup: match parent + name
+            parts = name.rsplit("/", 1)
+            parent_path, node_name = parts
+            for n in self.nodes:
+                if n.name == node_name and n.parent == parent_path:
+                    return n
+                # Also check if parent is "." and path matches root child
+                if n.name == node_name:
+                    node_path = self.get_node_path(n)
+                    if node_path == name:
+                        return n
+            return None
         for n in self.nodes:
             if n.name == name:
                 return n
