@@ -25,6 +25,9 @@ from playgen.commands.config_cmd import config_cmd
 from playgen.commands.input_cmd import input_cmd
 from playgen.commands.resource_cmd import resource_cmd
 from playgen.commands.animation_cmd import animation_cmd
+from playgen.commands.asset_cmd import asset_cmd
+from playgen.commands.bridge_cmd import bridge_cmd
+from playgen.commands.snapshot_cmd import snapshot_cmd
 
 
 @click.group()
@@ -34,15 +37,26 @@ from playgen.commands.animation_cmd import animation_cmd
 def main(ctx: click.Context, project: str) -> None:
     """PlayGen - Vibe game dev CLI for Godot 4.x.
 
-    Create, analyze, run, and iterate on Godot game projects.
-    Designed for AI agent collaboration - all commands support --json-output.
+    Agent execution layer for AI-driven game prototyping.
+    All commands support --json-output for structured Agent consumption.
 
     \b
     Quick start:
       playgen init --template 2d-platformer   # Create a platformer project
       playgen build scene.json                # Build scene from JSON
       playgen run                              # Run the project
+      playgen run --observe                    # Run with runtime telemetry
       playgen analyze                          # See what's in the project
+
+    \b
+    Asset pipeline:
+      playgen asset import/attach/list         # Import & wire up assets
+
+    \b
+    Engine bridge (requires Godot):
+      playgen bridge validate-scene/read-tree  # Engine-native validation
+      playgen bridge validate-script           # GDScript validation
+      playgen bridge class-props               # Class introspection
 
     \b
     Project management:
@@ -51,6 +65,10 @@ def main(ctx: click.Context, project: str) -> None:
       playgen input add/remove/list            # Input mappings
       playgen resource create/list             # .tres resource files
       playgen animation add/list               # Animations
+
+    \b
+    Safety:
+      playgen snapshot save/restore/diff/list  # Project state snapshots
     """
     ctx.ensure_object(dict)
     ctx.obj["project_path"] = Path(project).resolve()
@@ -70,3 +88,6 @@ main.add_command(config_cmd)
 main.add_command(input_cmd)
 main.add_command(resource_cmd)
 main.add_command(animation_cmd)
+main.add_command(asset_cmd)
+main.add_command(bridge_cmd)
+main.add_command(snapshot_cmd)

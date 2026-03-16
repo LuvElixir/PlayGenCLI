@@ -1,8 +1,14 @@
-"""playgen run - Run the Godot project and capture output."""
+"""playgen run - Run the Godot project and capture output.
+
+With --observe, injects a telemetry autoload that captures runtime state
+(node positions, collisions, scene changes, custom events) and provides
+structured feedback to the Agent after execution.
+"""
 
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import click
@@ -15,6 +21,7 @@ from playgen.godot.runner import find_godot, run_project, check_project
 @click.option("--timeout", "-t", default=30, help="Timeout in seconds (default: 30)")
 @click.option("--check-only", is_flag=True, help="Validate project without running (headless)")
 @click.option("--debug-collisions", is_flag=True, help="Show collision shapes while running")
+@click.option("--observe", is_flag=True, help="Inject runtime observer for structured telemetry")
 @click.option("--json-output", "as_json", is_flag=True, help="Output as JSON")
 @click.pass_context
 def run_cmd(
@@ -23,6 +30,7 @@ def run_cmd(
     timeout: int,
     check_only: bool,
     debug_collisions: bool,
+    observe: bool,
     as_json: bool,
 ) -> None:
     """Run the Godot project.
@@ -30,7 +38,20 @@ def run_cmd(
     Launches the project using the Godot engine, captures stdout/stderr,
     parses error messages, and returns structured results.
 
+    With --observe, injects a telemetry autoload that captures:
+    - Node positions (sampled every 30 frames)
+    - Physics collision events
+    - Scene tree changes (node added/removed)
+    - Custom events from game scripts via PlayGenObserver.log_custom()
+
     Set GODOT_PATH environment variable to specify the Godot executable.
+
+    \b
+    Examples:
+      playgen run                          # Run with default timeout
+      playgen run --timeout 10             # Run for 10 seconds
+      playgen run --observe --json-output  # Run with telemetry, get JSON
+      playgen run --check-only             # Validate without running
     """
     project_path: Path = ctx.obj["project_path"]
 
@@ -63,42 +84,92 @@ def run_cmd(
     if not as_json:
         click.echo(f"Using Godot: {godot}")
 
-    if check_only:
-        result = check_project(project_path, godot_path=godot)
-    else:
-        extra_args = []
-        if debug_collisions:
-            extra_args.append("--debug-collisions")
-        result = run_project(
-            project_path,
-            scene=scene,
-            timeout=timeout,
-            godot_path=godot,
-            extra_args=extra_args,
-        )
+    # Inject observer if requested
+    telemetry_path = None
+    if observe and not check_only:
+        from playgen.godot.observe import inject_observer, get_default_telemetry_path
+        inject_observer(project_path)
+        telemetry_path = get_default_telemetry_path(project_path)
+        telemetry_path.parent.mkdir(parents=True, exist_ok=True)
+        # Set env var so observer writes to our path
+        os.environ["PLAYGEN_TELEMETRY_PATH"] = str(telemetry_path)
+        if not as_json:
+            click.echo("Runtime observer injected.")
 
-    if as_json:
-        click.echo(json.dumps(result.to_dict(), indent=2))
-    else:
-        if result.success:
-            click.echo("Project ran successfully.")
+    try:
+        if check_only:
+            result = check_project(project_path, godot_path=godot)
         else:
-            click.echo("Project encountered issues:")
+            extra_args = []
+            if debug_collisions:
+                extra_args.append("--debug-collisions")
+            result = run_project(
+                project_path,
+                scene=scene,
+                timeout=timeout,
+                godot_path=godot,
+                extra_args=extra_args,
+            )
 
-        if result.errors:
-            click.echo(f"\nErrors ({len(result.errors)}):")
-            for err in result.errors:
-                loc = ""
-                if "file" in err:
-                    loc = f"  {err['file']}"
-                    if "line" in err:
-                        loc += f":{err['line']}"
-                click.echo(f"  {err['message']}{loc}")
+        # Build output
+        output = result.to_dict()
 
-        if result.warnings:
-            click.echo(f"\nWarnings ({len(result.warnings)}):")
-            for w in result.warnings:
-                click.echo(f"  {w}")
+        # Parse telemetry if observer was active
+        if observe and telemetry_path and not check_only:
+            from playgen.godot.observe import parse_telemetry
+            report = parse_telemetry(telemetry_path)
+            output["telemetry"] = report.to_dict()
 
-        if result.stderr and not result.errors:
-            click.echo(f"\nStderr output:\n{result.stderr[:1000]}")
+        if as_json:
+            click.echo(json.dumps(output, indent=2))
+        else:
+            if result.success:
+                click.echo("Project ran successfully.")
+            else:
+                click.echo("Project encountered issues:")
+
+            if result.errors:
+                click.echo(f"\nErrors ({len(result.errors)}):")
+                for err in result.errors:
+                    loc = ""
+                    if "file" in err:
+                        loc = f"  {err['file']}"
+                        if "line" in err:
+                            loc += f":{err['line']}"
+                    click.echo(f"  {err['message']}{loc}")
+
+            if result.warnings:
+                click.echo(f"\nWarnings ({len(result.warnings)}):")
+                for w in result.warnings:
+                    click.echo(f"  {w}")
+
+            if result.stderr and not result.errors:
+                click.echo(f"\nStderr output:\n{result.stderr[:1000]}")
+
+            # Print telemetry summary
+            if observe and telemetry_path and not check_only:
+                from playgen.godot.observe import parse_telemetry
+                report = parse_telemetry(telemetry_path)
+                click.echo(f"\nRuntime telemetry: {report._summary()}")
+                if report.node_positions:
+                    click.echo("  Last known positions:")
+                    for node_path, pos in report.node_positions.items():
+                        click.echo(f"    {node_path}: {pos}")
+                if report.collisions:
+                    click.echo(f"  Collisions: {len(report.collisions)}")
+                    for col in report.collisions[:5]:
+                        d = col.get("data", {})
+                        click.echo(f"    {d.get('body', '?')} -> {d.get('collider', '?')}")
+                if report.custom_events:
+                    click.echo(f"  Custom events: {len(report.custom_events)}")
+                    for evt in report.custom_events[:5]:
+                        click.echo(f"    [{evt.get('type', '?')}] {evt.get('data', {})}")
+
+    finally:
+        # Clean up observer if injected
+        if observe and not check_only:
+            from playgen.godot.observe import remove_observer
+            remove_observer(project_path)
+            os.environ.pop("PLAYGEN_TELEMETRY_PATH", None)
+            if not as_json:
+                click.echo("Runtime observer removed.")

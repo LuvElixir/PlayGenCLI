@@ -32,6 +32,10 @@ class GodotProject:
             return True
         return False
 
+    def remove(self, section: str, key: str) -> bool:
+        """Alias for delete()."""
+        return self.delete(section, key)
+
     @property
     def name(self) -> str:
         raw = self.get("application", "config/name", '"Untitled"')
