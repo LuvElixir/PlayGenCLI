@@ -22,6 +22,9 @@ from playgen.godot.runner import find_godot, run_project, check_project
 @click.option("--check-only", is_flag=True, help="Validate project without running (headless)")
 @click.option("--debug-collisions", is_flag=True, help="Show collision shapes while running")
 @click.option("--observe", is_flag=True, help="Inject runtime observer for structured telemetry")
+@click.option("--screenshot", "screenshot_frames", default=None, type=int,
+              help="Capture screenshot after N frames (e.g., --screenshot 60)")
+@click.option("--screenshot-output", default=None, help="Screenshot output path (default: .playgen/screenshot.png)")
 @click.option("--json-output", "as_json", is_flag=True, help="Output as JSON")
 @click.pass_context
 def run_cmd(
@@ -31,6 +34,8 @@ def run_cmd(
     check_only: bool,
     debug_collisions: bool,
     observe: bool,
+    screenshot_frames: int | None,
+    screenshot_output: str | None,
     as_json: bool,
 ) -> None:
     """Run the Godot project.
@@ -44,14 +49,19 @@ def run_cmd(
     - Scene tree changes (node added/removed)
     - Custom events from game scripts via PlayGenObserver.log_custom()
 
+    With --screenshot N, captures the viewport after N frames and saves to PNG.
+    The Agent (or human) can then inspect the result to verify the game looks correct.
+
     Set GODOT_PATH environment variable to specify the Godot executable.
 
     \b
     Examples:
-      playgen run                          # Run with default timeout
-      playgen run --timeout 10             # Run for 10 seconds
-      playgen run --observe --json-output  # Run with telemetry, get JSON
-      playgen run --check-only             # Validate without running
+      playgen run                              # Run with default timeout
+      playgen run --timeout 10                 # Run for 10 seconds
+      playgen run --observe --json-output      # Run with telemetry, get JSON
+      playgen run --screenshot 60              # Capture screenshot after 60 frames
+      playgen run --screenshot 120 --observe   # Screenshot + telemetry
+      playgen run --check-only                 # Validate without running
     """
     project_path: Path = ctx.obj["project_path"]
 
@@ -96,6 +106,16 @@ def run_cmd(
         if not as_json:
             click.echo("Runtime observer injected.")
 
+    # Inject screenshot capture if requested
+    screenshot_path = None
+    if screenshot_frames is not None and not check_only:
+        from playgen.godot.observe import inject_screenshot
+        screenshot_path = inject_screenshot(
+            project_path, frames=screenshot_frames, output_path=screenshot_output,
+        )
+        if not as_json:
+            click.echo(f"Screenshot capture injected (frame {screenshot_frames}).")
+
     try:
         if check_only:
             result = check_project(project_path, godot_path=godot)
@@ -119,6 +139,16 @@ def run_cmd(
             from playgen.godot.observe import parse_telemetry
             report = parse_telemetry(telemetry_path)
             output["telemetry"] = report.to_dict()
+
+        # Report screenshot result
+        if screenshot_path and not check_only:
+            if screenshot_path.exists():
+                output["screenshot"] = {
+                    "path": str(screenshot_path),
+                    "size_bytes": screenshot_path.stat().st_size,
+                }
+            else:
+                output["screenshot"] = {"error": "Screenshot was not captured"}
 
         if as_json:
             click.echo(json.dumps(output, indent=2))
@@ -153,6 +183,14 @@ def run_cmd(
                     if len(stderr_lines) > 20:
                         click.echo(f"  ... ({len(stderr_lines) - 20} more lines)")
 
+            # Print screenshot result
+            if screenshot_path and not check_only:
+                if screenshot_path.exists():
+                    size_kb = screenshot_path.stat().st_size / 1024
+                    click.echo(f"\nScreenshot saved: {screenshot_path} ({size_kb:.1f} KB)")
+                else:
+                    click.echo("\nScreenshot: capture failed (game may have exited early)")
+
             # Print telemetry summary
             if observe and telemetry_path and not check_only:
                 from playgen.godot.observe import parse_telemetry
@@ -180,3 +218,10 @@ def run_cmd(
             os.environ.pop("PLAYGEN_TELEMETRY_PATH", None)
             if not as_json:
                 click.echo("Runtime observer removed.")
+
+        # Clean up screenshot if injected
+        if screenshot_frames is not None and not check_only:
+            from playgen.godot.observe import remove_screenshot
+            remove_screenshot(project_path)
+            if not as_json:
+                click.echo("Screenshot capture removed.")

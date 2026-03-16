@@ -1,4 +1,4 @@
-# PlayGen CLI (v0.5.2)
+# PlayGen CLI (v0.6.0)
 
 Agent execution layer for Godot 4.x. Lets AI Agents go from idea to playable prototype by providing a complete, closable, observable, and recoverable control plane over Godot projects.
 
@@ -28,7 +28,8 @@ PlayGenCLI is NOT a product surface — it is an **Agent's Godot execution backe
   - `godot/project_file.py` - project.godot parser/writer (supports multi-line values)
   - `godot/runner.py` - Godot executable finder and project runner
   - `godot/bridge.py` - Engine-native bridge (GDScript + headless Godot)
-  - `godot/observe.py` - Runtime telemetry observer (autoload injection)
+  - `godot/observe.py` - Runtime telemetry observer + screenshot capture (autoload injection)
+  - `godot/visibility.py` - Invisible node detection (the #1 Agent failure mode)
   - `templates/` - project/scene/script templates, EXTENDS_DEFAULTS for smart type-specific scripts
 
 ## Commands
@@ -37,6 +38,7 @@ PlayGenCLI is NOT a product surface — it is an **Agent's Godot execution backe
 playgen init        # Initialize Godot project (with templates)
 playgen build       # Build complete scene from JSON (highest-leverage command)
 playgen analyze     # Show project state (scenes, scripts, resources, signals)
+playgen analyze --check-visibility  # Detect invisible nodes (no visual children)
 playgen scene       # Scene operations (create, tree, list)
 playgen node        # Node operations (add, remove, set, copy, list)
 playgen script      # Script operations (create, attach, list)
@@ -73,8 +75,15 @@ playgen snapshot delete    # Remove a snapshot
 # System
 playgen run             # Run project via Godot CLI, capture output
 playgen run --observe   # Run with runtime telemetry (positions, collisions, events)
+playgen run --screenshot 60  # Capture screenshot after 60 frames
 playgen doctor          # Diagnose and fix common issues
 ```
+
+## Feedback loop (v0.6.0)
+- `build` auto-checks visibility: warns when physics nodes have no visual children
+- `analyze --check-visibility` detects invisible nodes across all scenes
+- `run --screenshot N` captures viewport to PNG after N frames
+- `run --screenshot 60 --observe` combines screenshot + telemetry for full feedback
 
 ## Build command enhancements (v0.5.0)
 - `--snapshot NAME` auto-saves project state before build (safety net)

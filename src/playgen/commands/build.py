@@ -287,6 +287,10 @@ def build_cmd(ctx: click.Context, source: str, as_json: bool, dry_run: bool, sna
         if not val_result.success:
             errors.append(f"Engine validation failed: {val_result.error}")
 
+    # Auto-check visibility (always, not optional — this is the #1 Agent failure mode)
+    from playgen.godot.visibility import check_visibility
+    vis_report = check_visibility(scene, scene_name, project_path)
+
     # Output
     result = {
         "scene": scene_name,
@@ -297,6 +301,8 @@ def build_cmd(ctx: click.Context, source: str, as_json: bool, dry_run: bool, sna
         "connections": len(scene.connections),
         "dry_run": dry_run,
     }
+    if vis_report.has_issues:
+        result["visibility_warnings"] = [w.to_dict() for w in vis_report.warnings]
     if snap_name:
         result["snapshot"] = snap_name
     if validation is not None:
@@ -320,6 +326,11 @@ def build_cmd(ctx: click.Context, source: str, as_json: bool, dry_run: bool, sna
             click.echo(f"  Files ({len(created_files)}):")
             for f in created_files:
                 click.echo(f"    {project_path / f}")
+        if vis_report.has_issues:
+            click.echo(f"  Visibility warnings:")
+            for w in vis_report.warnings:
+                icon = "!!" if w.severity == "warning" else "??"
+                click.echo(f"    [{icon}] {w.node_name} ({w.node_type}) — {w.message}")
         if errors:
             for e in errors:
                 click.echo(f"  Warning: {e}", err=True)

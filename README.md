@@ -57,6 +57,7 @@ playgen doctor                           # Check for issues
 | **System** | |
 | `playgen run` | Run project via Godot CLI, capture output |
 | `playgen run --observe` | Run with runtime telemetry (positions, collisions, events) |
+| `playgen run --screenshot N` | Capture screenshot after N frames |
 | `playgen doctor` | Diagnose and fix common issues |
 
 All commands support `--json-output` for machine-readable output, making them suitable for any AI Agent.
@@ -72,6 +73,8 @@ PlayGenCLI uses a **hybrid execution model**:
 
 - **Asset pipeline**: `asset import` + `asset attach` lets Agents wire images, audio, and fonts into scenes without manual editor interaction
 - **Engine-native bridge**: Godot headless mode provides authoritative validation and introspection beyond text parsing
+- **Visibility checking**: `build` auto-detects invisible nodes (physics bodies without visual children) — the #1 cause of "commands succeed but nothing on screen"
+- **Screenshot capture**: `run --screenshot 60` captures the viewport after 60 frames — Agent or human can verify visual result
 - **Runtime observation**: `run --observe` injects telemetry autoload that captures node positions, collisions, scene changes, and custom events — structured JSON feedback for the Agent
 - **Snapshot/rollback**: `snapshot save/restore` enables safe multi-step operations with rollback on failure
 - **`build` command**: Agent outputs one JSON, gets a complete runnable scene — with `--snapshot` safety net and `--validate` engine check
@@ -89,6 +92,23 @@ PlayGenCLI uses a **hybrid execution model**:
 ---
 
 ## Changelog
+
+### v0.6.0 — 2026-03-16
+
+**Closing the feedback loop** — the #1 Agent failure mode is "20 commands succeed but nothing appears on screen." v0.6.0 adds visibility detection and screenshot capture to let Agents verify their work.
+
+**Visibility check** (`analyze --check-visibility` + auto in `build`):
+- Detects physics nodes (CharacterBody2D, Area2D, etc.) without visual children (Sprite2D, Polygon2D, MeshInstance, etc.)
+- `build` now **automatically warns** about invisible nodes in every build output — Agent gets immediate feedback
+- Checks instance file existence and script file existence
+- Covers 2D + 3D: Sprite2D, AnimatedSprite2D, Polygon2D, MeshInstance3D, CSG shapes, Labels, UI controls, etc.
+- Example: `[!!] Enemy (CharacterBody2D) — No visual child node (needs Sprite2D, Polygon2D, ...)`
+
+**Screenshot capture** (`run --screenshot N`):
+- `playgen run --screenshot 60` — runs the game, captures viewport after 60 frames, saves PNG
+- Can combine with `--observe` for screenshot + telemetry
+- Autoload injection/cleanup pattern (same as observer)
+- Agent or human can inspect the screenshot to verify visual result
 
 ### v0.5.2 — 2026-03-16
 

@@ -206,6 +206,98 @@ OBSERVER_SCRIPT_NAME = "playgen_observer.gd"
 OBSERVER_AUTOLOAD_NAME = "PlayGenObserver"
 
 
+# --- Screenshot capture script ---
+# Runs N frames then captures viewport to PNG and quits.
+
+SCREENSHOT_SCRIPT = r'''extends Node
+
+## PlayGen Screenshot Capture - auto-injected, captures viewport after N frames.
+
+var _target_frame: int = 60
+var _output_path: String = ""
+var _frame_count: int = 0
+
+func _ready() -> void:
+	var env_frames: String = OS.get_environment("PLAYGEN_SCREENSHOT_FRAMES")
+	if env_frames != "":
+		_target_frame = int(env_frames)
+	_output_path = OS.get_environment("PLAYGEN_SCREENSHOT_PATH")
+	if _output_path == "":
+		_output_path = "user://playgen_screenshot.png"
+
+func _process(_delta: float) -> void:
+	_frame_count += 1
+	if _frame_count >= _target_frame:
+		_capture()
+
+func _capture() -> void:
+	# Wait one more frame so the viewport is fully rendered
+	await get_tree().process_frame
+	var img: Image = get_viewport().get_texture().get_image()
+	if img:
+		img.save_png(_output_path)
+		print("PLAYGEN_SCREENSHOT_SAVED:" + _output_path)
+	else:
+		print("PLAYGEN_SCREENSHOT_FAILED:Could not capture viewport")
+	get_tree().quit()
+'''
+
+SCREENSHOT_SCRIPT_NAME = "playgen_screenshot.gd"
+SCREENSHOT_AUTOLOAD_NAME = "PlayGenScreenshot"
+
+
+def inject_screenshot(project_path: Path, frames: int = 60,
+                      output_path: str | None = None) -> Path:
+    """Inject the screenshot capture autoload into the project.
+
+    Returns the path where the screenshot will be saved.
+    """
+    import os
+
+    script_path = project_path / SCREENSHOT_SCRIPT_NAME
+    script_path.write_text(SCREENSHOT_SCRIPT, encoding="utf-8")
+
+    # Add as autoload
+    try:
+        proj = load_project(project_path)
+        proj.set("autoload", SCREENSHOT_AUTOLOAD_NAME,
+                 f'"*res://{SCREENSHOT_SCRIPT_NAME}"')
+        save_project(proj, project_path)
+    except FileNotFoundError:
+        pass
+
+    # Set env vars for the script
+    os.environ["PLAYGEN_SCREENSHOT_FRAMES"] = str(frames)
+    if output_path:
+        os.environ["PLAYGEN_SCREENSHOT_PATH"] = output_path
+    else:
+        default_path = str(project_path / ".playgen" / "screenshot.png")
+        (project_path / ".playgen").mkdir(parents=True, exist_ok=True)
+        os.environ["PLAYGEN_SCREENSHOT_PATH"] = default_path
+        output_path = default_path
+
+    return Path(output_path)
+
+
+def remove_screenshot(project_path: Path) -> None:
+    """Remove the screenshot capture from the project."""
+    import os
+
+    script_path = project_path / SCREENSHOT_SCRIPT_NAME
+    if script_path.exists():
+        script_path.unlink()
+
+    try:
+        proj = load_project(project_path)
+        proj.remove("autoload", SCREENSHOT_AUTOLOAD_NAME)
+        save_project(proj, project_path)
+    except (FileNotFoundError, KeyError):
+        pass
+
+    os.environ.pop("PLAYGEN_SCREENSHOT_FRAMES", None)
+    os.environ.pop("PLAYGEN_SCREENSHOT_PATH", None)
+
+
 def inject_observer(project_path: Path) -> Path:
     """Inject the runtime observer autoload into the project.
 

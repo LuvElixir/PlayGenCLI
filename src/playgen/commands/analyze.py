@@ -13,9 +13,10 @@ from playgen.godot.tscn import parse_tscn
 
 @click.command("analyze")
 @click.option("--scene", "-s", default=None, help="Analyze a specific scene in detail")
+@click.option("--check-visibility", "check_vis", is_flag=True, help="Check for invisible nodes (no visual children)")
 @click.option("--json-output", "as_json", is_flag=True, help="Output as JSON")
 @click.pass_context
-def analyze_cmd(ctx: click.Context, scene: str | None, as_json: bool) -> None:
+def analyze_cmd(ctx: click.Context, scene: str | None, check_vis: bool, as_json: bool) -> None:
     """Analyze the current Godot project.
 
     Shows project configuration, scenes, scripts, and their relationships.
@@ -33,12 +34,12 @@ def analyze_cmd(ctx: click.Context, scene: str | None, as_json: bool) -> None:
         return
 
     if scene:
-        _analyze_scene(project_path, scene, as_json)
+        _analyze_scene(project_path, scene, as_json, check_vis)
     else:
-        _analyze_project(project_path, as_json)
+        _analyze_project(project_path, as_json, check_vis)
 
 
-def _analyze_project(project_path: Path, as_json: bool) -> None:
+def _analyze_project(project_path: Path, as_json: bool, check_vis: bool = False) -> None:
     proj = load_project(project_path)
 
     # Collect scenes (exclude .godot and .playgen internal dirs)
@@ -128,6 +129,17 @@ def _analyze_project(project_path: Path, as_json: bool) -> None:
         for r in resource_files
     ]
 
+    # Visibility check
+    visibility_info = []
+    if check_vis:
+        from playgen.godot.visibility import check_visibility
+        for sf in scene_files:
+            rel = str(sf.relative_to(project_path)).replace("\\", "/")
+            scene_obj = parse_tscn(sf.read_text(encoding="utf-8"))
+            vis_report = check_visibility(scene_obj, rel, project_path)
+            if vis_report.has_issues:
+                visibility_info.append(vis_report.to_dict())
+
     result = {
         "project_name": proj.name,
         "main_scene": proj.main_scene,
@@ -143,6 +155,8 @@ def _analyze_project(project_path: Path, as_json: bool) -> None:
             "total_sub_resources": sum(len(si["sub_resources"]) for si in scenes_info),
         },
     }
+    if visibility_info:
+        result["visibility_warnings"] = visibility_info
 
     if as_json:
         click.echo(json.dumps(result, indent=2))
@@ -177,8 +191,19 @@ def _analyze_project(project_path: Path, as_json: bool) -> None:
             for ri in resources_info:
                 click.echo(f"  {ri['path']}")
 
+        if visibility_info:
+            click.echo(f"\nVisibility warnings:")
+            for vi in visibility_info:
+                click.echo(f"  {vi['scene']}:")
+                for w in vi["warnings"]:
+                    icon = "!!" if w["severity"] == "warning" else "??"
+                    click.echo(f"    [{icon}] {w['node']} ({w['type']}) — {w['message']}")
+        elif check_vis:
+            click.echo(f"\nVisibility check: all nodes OK")
 
-def _analyze_scene(project_path: Path, scene_name: str, as_json: bool) -> None:
+
+def _analyze_scene(project_path: Path, scene_name: str, as_json: bool,
+                   check_vis: bool = False) -> None:
     if not scene_name.endswith(".tscn"):
         scene_name += ".tscn"
 
@@ -204,6 +229,13 @@ def _analyze_scene(project_path: Path, scene_name: str, as_json: bool) -> None:
         ],
         "node_count": len(scene.nodes),
     }
+
+    # Visibility check
+    vis_report = None
+    if check_vis:
+        from playgen.godot.visibility import check_visibility
+        vis_report = check_visibility(scene, scene_name, project_path)
+        result["visibility"] = vis_report.to_dict()
 
     if as_json:
         click.echo(json.dumps(result, indent=2))
@@ -235,3 +267,11 @@ def _analyze_scene(project_path: Path, scene_name: str, as_json: bool) -> None:
             click.echo(f"\nSignal connections:")
             for c in scene.connections:
                 click.echo(f"  {c.from_node}.{c.signal_name} -> {c.to_node}.{c.method}()")
+
+        if vis_report and vis_report.has_issues:
+            click.echo(f"\nVisibility warnings ({vis_report.summary()}):")
+            for w in vis_report.warnings:
+                icon = "!!" if w.severity == "warning" else "??"
+                click.echo(f"  [{icon}] {w.node_name} ({w.node_type}) — {w.message}")
+        elif check_vis:
+            click.echo(f"\nVisibility check: all nodes OK")
