@@ -3,20 +3,20 @@
 <p align="center"><a href="README.md">English</a> · <strong>简体中文</strong></p>
 <p align="center"><a href="#快速开始">快速开始</a> · <a href="AGENT_GUIDE.md">Agent 指南</a> · <a href="README.reference.md#commands">命令参考</a> · <a href="README.reference.md#changelog">更新记录</a></p>
 
-# 让 Agent 能搭建，也能检查游戏
+# Agent 改完 Godot 工程，可以直接运行检查
 
-PlayGenCLI 是面向 Godot 4.x 的 Python 命令行工具。Agent 可以创建场景、连接素材、编辑脚本、配置工程，并通过结构化 JSON 读取操作结果。
+PlayGenCLI 给 Agent 提供了一组操作 Godot 4.x 工程的命令。创建场景、修改脚本、配置素材后，Agent 可以启动引擎，读取运行记录和截图，再决定下一步怎么改。命令结果通过 JSON 返回。
 
-一次迭代可以接上引擎校验、运行观察与画面截图。修改出现问题时，可以从文件快照恢复工程，再继续调整。
+修改前可以保存文件快照。如果这一轮改坏了，就恢复快照，重新尝试。
 
 ![描述意图、搭建工程、观察结果、继续迭代](.readme-assets/workflow.zh-CN.png)
 
-## 每次迭代需要的工具
+## 从搭建工程到运行检查
 
 | 任务 | 命令 | 结果 |
 | --- | --- | --- |
 | 创建工程 | `init`、`build` | Godot 工程与场景文件。 |
-| 调整场景 | `scene`、`node`、`script`、`signal` | 对场景结构与行为进行结构化编辑。 |
+| 调整场景 | `scene`、`node`、`script`、`signal` | 修改场景中的节点、脚本与信号连接。 |
 | 接入创作素材 | `asset`、`resource`、`animation` | 图片、声音、字体、资源与动画。 |
 | 检查结果 | `analyze`、`bridge`、`run` | 工程结构、引擎校验与运行反馈。 |
 | 恢复修改 | `snapshot save`、`snapshot restore` | 基于文件的工程快照。 |
@@ -35,7 +35,7 @@ flowchart LR
   E <--> G[文件快照]
 ```
 
-文本操作可以直接编辑工程。引擎校验、运行观察与截图需要本机安装 Godot。运行反馈帮助检查这一轮修改，游戏设计是否有趣仍需要试玩和判断。
+文本操作可以直接编辑工程。引擎校验、运行观察与截图需要本机安装 Godot。这些反馈能帮助检查工程有没有运行起来。游戏是否好玩，还得实际试玩。
 
 ## 快速开始
 
