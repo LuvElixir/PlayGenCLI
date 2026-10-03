@@ -1,4 +1,4 @@
-![PlayGen CLI · 让 Agent 搭建 Godot 工程](.readme-assets/hero.svg)
+![PlayGen CLI · 让 Agent 搭建 Godot 工程](.readme-assets/hero.zh-CN.svg)
 
 <p align="center"><a href="README.md">English</a> · <strong>简体中文</strong></p>
 <p align="center"><a href="#快速开始">快速开始</a> · <a href="AGENT_GUIDE.md">Agent 指南</a> · <a href="README.reference.md#commands">命令参考</a> · <a href="README.reference.md#changelog">更新记录</a></p>
