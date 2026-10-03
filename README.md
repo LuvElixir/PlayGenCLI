@@ -1,4 +1,4 @@
-![PlayGen CLI · Build Godot projects with agents](.readme-assets/hero.svg)
+![PlayGen CLI · Build Godot projects with agents](.readme-assets/hero.png)
 
 <p align="center"><strong>English</strong> · <a href="README.zh-CN.md">简体中文</a></p>
 <p align="center"><a href="#quick-start">Quick start</a> · <a href="AGENT_GUIDE.md">Agent guide</a> · <a href="README.reference.md#commands">Command reference</a> · <a href="README.reference.md#changelog">Changelog</a></p>
@@ -9,7 +9,7 @@ PlayGenCLI is a Python command-line tool for Godot 4.x. It lets an agent create 
 
 The feedback loop includes engine validation, runtime observations, and viewport capture. File snapshots provide a recovery point when an iteration goes wrong.
 
-![Describe, build, observe, and refine a Godot project](.readme-assets/workflow.svg)
+![Describe, build, observe, and refine a Godot project](.readme-assets/workflow.png)
 
 ## The tools behind an iteration
 

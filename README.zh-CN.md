@@ -1,4 +1,4 @@
-![PlayGen CLI · 让 Agent 搭建 Godot 工程](.readme-assets/hero.zh-CN.svg)
+![PlayGen CLI · 让 Agent 搭建 Godot 工程](.readme-assets/hero.zh-CN.png)
 
 <p align="center"><a href="README.md">English</a> · <strong>简体中文</strong></p>
 <p align="center"><a href="#快速开始">快速开始</a> · <a href="AGENT_GUIDE.md">Agent 指南</a> · <a href="README.reference.md#commands">命令参考</a> · <a href="README.reference.md#changelog">更新记录</a></p>
@@ -9,7 +9,7 @@ PlayGenCLI 是面向 Godot 4.x 的 Python 命令行工具。Agent 可以创建�
 
 一次迭代可以接上引擎校验、运行观察与画面截图。修改出现问题时，可以从文件快照恢复工程，再继续调整。
 
-![描述意图、搭建工程、观察结果、继续迭代](.readme-assets/workflow.zh-CN.svg)
+![描述意图、搭建工程、观察结果、继续迭代](.readme-assets/workflow.zh-CN.png)
 
 ## 每次迭代需要的工具
 
