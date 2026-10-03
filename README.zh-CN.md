@@ -1,13 +1,13 @@
-![PlayGen CLI · 让 Agent 搭建 Godot 工程](.readme-assets/hero.zh-CN.png)
+![PlayGen CLI · 面向 Agent 的 Godot 开发工具](.readme-assets/hero.zh-CN.png)
 
 <p align="center"><a href="README.md">English</a> · <strong>简体中文</strong></p>
 <p align="center"><a href="#快速开始">快速开始</a> · <a href="AGENT_GUIDE.md">Agent 指南</a> · <a href="README.reference.md#commands">命令参考</a> · <a href="README.reference.md#changelog">更新记录</a></p>
 
-# Agent 改完 Godot 工程，可以直接运行检查
+# 面向 Agent 的 Godot 开发工具
 
-PlayGenCLI 给 Agent 提供了一组操作 Godot 4.x 工程的命令。创建场景、修改脚本、配置素材后，Agent 可以启动引擎，读取运行记录和截图，再决定下一步怎么改。命令结果通过 JSON 返回。
+PlayGenCLI 将 Godot 4.x 的工程编辑、引擎校验与运行观察接入命令行，为 Agent 提供结构化的 JSON 输入输出。
 
-修改前可以保存文件快照。如果这一轮改坏了，就恢复快照，重新尝试。
+Agent 可以创建场景、修改脚本，再调用 Godot 获取日志与截图，用实际运行的反馈指导下一轮修改。文件快照支持保存和恢复工程版本，便于迭代中的检查与回退。
 
 ![描述意图、搭建工程、观察结果、继续迭代](.readme-assets/workflow.zh-CN.png)
 
@@ -21,7 +21,7 @@ PlayGenCLI 给 Agent 提供了一组操作 Godot 4.x 工程的命令。创建场
 | 检查结果 | `analyze`、`bridge`、`run` | 工程结构、引擎校验与运行反馈。 |
 | 恢复修改 | `snapshot save`、`snapshot restore` | 基于文件的工程快照。 |
 
-## 两层执行方式
+## 执行结构
 
 ```mermaid
 flowchart LR
@@ -35,7 +35,7 @@ flowchart LR
   E <--> G[文件快照]
 ```
 
-文本操作可以直接编辑工程。引擎校验、运行观察与截图需要本机安装 Godot。这些反馈能帮助检查工程有没有运行起来。游戏是否好玩，还得实际试玩。
+工程文件可通过文本命令直接编辑。引擎校验、运行观察与截图依赖本机安装的 Godot，反馈用于检查工程结构与运行状态。玩法体验仍需通过实际试玩评估。
 
 ## 快速开始
 
@@ -56,9 +56,9 @@ playgen --project ../playgen-demo run --observe --timeout 10
 
 Windows 可在 PowerShell 中使用 `.venv\Scripts\Activate.ps1` 激活环境。最后一条命令会通过 Godot 运行生成的工程，并收集运行记录。
 
-## 用 JSON 搭一个场景
+## JSON 场景示例
 
-把下面的内容保存为演示工程里的 `scene.json`。
+将以下内容保存为演示工程中的 `scene.json`。
 
 ```json
 {
