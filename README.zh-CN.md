@@ -42,8 +42,8 @@ flowchart LR
 准备 **Python 3.10+**。需要引擎能力时，安装 **Godot 4.x** 并加入 `PATH`，或配置 `GODOT_PATH`。
 
 ```bash
-git clone https://github.com/LuvElixir/PlayGenCLI.git
-cd PlayGenCLI
+git clone https://github.com/LuvElixir/playgen-cli.git
+cd playgen-cli
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .

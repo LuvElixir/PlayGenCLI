@@ -42,8 +42,8 @@ Text operations can edit a project without launching Godot. Engine validation, r
 Use **Python 3.10+**. Install **Godot 4.x** for the engine-backed commands, and add it to `PATH` or set `GODOT_PATH`.
 
 ```bash
-git clone https://github.com/LuvElixir/PlayGenCLI.git
-cd PlayGenCLI
+git clone https://github.com/LuvElixir/playgen-cli.git
+cd playgen-cli
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
